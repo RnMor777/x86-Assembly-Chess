@@ -29,4 +29,4 @@ Things to implement:
 
 # Screenshots
 
-[![Example Chess Moves](media/chess.gif)]
+![Example Chess Moves](media/chess.gif)
