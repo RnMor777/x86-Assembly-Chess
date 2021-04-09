@@ -3,6 +3,15 @@ Fully working chess game implemented in the x86 Intel Assembly language
 The project is my CSC-314 final project
 
 <hr>
+To compile the code you need:
+ * nasm
+ * gcc-multilib
+
+To compile/run the code do:
+ * make
+ * ./Chess
+
+<hr>
 
 Features Include:
  * Error checked movement for all pieces
@@ -16,3 +25,6 @@ Features Include:
 Things to implement:
  * Checking/Checkmate 
  * AI?
+
+<hr>
+# Screenshots
