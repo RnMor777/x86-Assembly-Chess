@@ -29,4 +29,4 @@ Things to implement:
 
 # Screenshots
 
-<a href="https://asciinema.org/a/406090" target="_blank"><img src="https://asciinema.org/a/406090.svg" /></a>
+[![asciicast](https://asciinema.org/a/406090.svg)](https://asciinema.org/a/406090)
