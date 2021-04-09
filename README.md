@@ -29,4 +29,4 @@ Things to implement:
 
 # Screenshots
 
-[![asciicast](https://asciinema.org/a/406090.svg)](https://asciinema.org/a/406090)
+[![Example Chess Moves](media/chess.gif)]
