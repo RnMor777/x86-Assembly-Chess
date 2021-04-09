@@ -26,5 +26,4 @@ Things to implement:
  * Checking/Checkmate 
  * AI?
 
-<hr>
 # Screenshots
