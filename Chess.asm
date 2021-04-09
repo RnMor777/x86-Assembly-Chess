@@ -1,7 +1,6 @@
-;%include "/usr/local/share/csc314/asm_io.inc"
-%define BOARD_FILE 'board.txt'
-%define INTRO_FILE 'intro.txt'
-%define STRUC_FILE 'instructions.txt'
+%define BOARD_FILE 'media/board.txt'
+%define INTRO_FILE 'media/intro.txt'
+%define STRUC_FILE 'media/instructions.txt'
 %define EXITCHAR 'x'
 %define BACKCHAR 'z'
 %define UNDOCHAR 'u'
@@ -1889,3 +1888,5 @@ init_intro:
     mov     esp, ebp
     pop     ebp
     ret
+
+; vim:ft=nasm
