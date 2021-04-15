@@ -22,6 +22,7 @@ Features Include:
  * Undo function
  * Captured piece tracking
  * Turn system
+ * Ability to save and load a game
 
 Things to implement:
  * Checking/Checkmate 
