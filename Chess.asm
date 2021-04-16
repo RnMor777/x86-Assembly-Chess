@@ -1,3 +1,4 @@
+%include "/usr/local/share/csc314/asm_io.inc"
 %define BOARD_FILE 'media/board.txt'
 %define INTRO_FILE 'media/intro.txt'
 %define STRUC_FILE 'media/instructions.txt'
@@ -24,44 +25,45 @@ segment .data
     raw_mode_off_cmd    db  "stty -raw echo", 0
     clear_screen_cmd    db  "clear", 0
     color_normal        db  0x1b, "[0m", 0
-    color_black         db  0x1b, "[104m", 0
-    color_white         db  0x1b, "[44m", 0
-    color_edge          db  0x1b, "[100m", 0
+    color_square1       db  0x1b, "[104m", 0, 0
+    color_square2       db  0x1b, "[44m", 0, 0, 0
+    color_edge          db  0x1b, "[100m", 0, 0
     color_move          db  0x1b, "[42m", 0
-    color_foreground    db  0x1b, "[30m", 0
-    color_foreground2   db  0x1b, "[97m", 0
+    color_black         db  0x1b, "[30m", 0, 0, 0
+    color_white         db  0x1b, "[97m", 0
 
-    WPAWN               dw  __utf32__("♙"), 0, 0
-    WROOK               dw  __utf32__("♖"), 0, 0
-    WKNIGHT             dw  __utf32__("♘"), 0, 0
-    WBISH               dw  __utf32__("♗"), 0, 0
-    WQUEEN              dw  __utf32__("♕"), 0, 0
-    WKING               dw  __utf32__("♔"), 0, 0
     BPAWN               dw  __utf32__("♟"), 0, 0
     BROOK               dw  __utf32__("♜"), 0, 0
     BKNIGHT             dw  __utf32__("♞"), 0, 0
     BBISH               dw  __utf32__("♝"), 0, 0
     BQUEEN              dw  __utf32__("♛"), 0, 0
     BKING               dw  __utf32__("♚"), 0, 0
+    WPAWN               dw  __utf32__("♙"), 0, 0
+    WROOK               dw  __utf32__("♖"), 0, 0
+    WKNIGHT             dw  __utf32__("♘"), 0, 0
+    WBISH               dw  __utf32__("♗"), 0, 0
+    WQUEEN              dw  __utf32__("♕"), 0, 0
+    WKING               dw  __utf32__("♔"), 0, 0
     VERT                dw  __utf32__("│"), 0, 0
     HORIZ               dw  __utf32__("─"), 0, 0
     CORNUL              dw  __utf32__("┌"), 0, 0
     CORNUR              dw  __utf32__("┐"), 0, 0
     CORNLL              dw  __utf32__("└"), 0, 0
     CORNLR              dw  __utf32__("┘"), 0, 0
+    UNICSPACE           dw  __utf32__(" "), 0, 0
+    copysymbol          dw  __utf32__("©"), 0, 0
     frmt_unic           db  "%ls", 0
     frmt_reg            db  "%s", 0
-    copysymbol          dw  __utf32__("©"), 0, 0
     newline             db  10, 0
     frmt_locale         db  "", 0
-    frmt_space          db  " ", 0
     frmt_scan           db  "%c%d", 0
+    frmt_space          db  " ", 0
     frmt_space27        db  "%41s", 0
     frmt_space18        db  "%49s", 0
     frmt_print          db  "Enter a move: ", 0
     frmt_print2         db  "Enter a destination: ", 0
     error_moves         db  "No possible moves for piece",10, 13, 0
-    frmt_turn_white     db  "White's Turn",10,13,0
+    frmt_turn_white     db  "White's Turn",10,13,0,0
     frmt_turn_black     db  "Black's Turn",10,13,0
     frmt_instructions   db  "u - undo, z - back, x - exit",10,10,13,0
     frmt_capture1       db  " Captured by white: ", 0
@@ -69,6 +71,7 @@ segment .data
     frmt_promote        db  "Enter a promotion Bishop(B), Rook(R), Knight(K), or Queen (Q): ", 0
     frmt_intro          db  "Enter an option: ", 0
     frmt_cont           db  "---- Press any key to continue ----", 0
+    memjumparr          db  3,0,0,0,0,0,2,0,0,5,0,0,0,0,0,4,1
 
 segment .bss
     board       resb    (HEIGHT*WIDTH)
@@ -80,7 +83,6 @@ segment .bss
     xpos        resd    1
     ypos        resd    1
     select      resb    1
-    tmp         resd    2
     selectFlag  resb    1
     errorflag   resd    1
     prevChar    resb    1
@@ -88,9 +90,9 @@ segment .bss
     xyposCur    resd    1
     xyposLast1  resd    1
     xyposLast2  resd    1
-    playerTurn  resb    1
     captureW    resb    5
     captureB    resb    5
+    playerTurn  resb    1
     canCastleW  resb    2
     canCastleB  resb    2
     prevCastle  resb    4
@@ -108,10 +110,8 @@ segment .text
     extern  fopen
     extern  fread
     extern  fwrite
-    extern  fprintf
     extern  fgetc
     extern  fclose
-    extern  fcntl
     extern  setlocale
 
 asm_main:
@@ -518,13 +518,13 @@ asm_main:
             jne     next_castle
                 mov     BYTE[canCastleW], 0
                 mov     BYTE[canCastleW+1], 0
-                jmp     next_castle6
+                jmp     next_castle2
             next_castle:
             cmp     dl, "K"
             jne     next_castle2
                 mov     BYTE[canCastleB], 0
                 mov     BYTE[canCastleB+1], 0
-                jmp     next_castle6
+                jmp     next_castle2
 
             next_castle2:
             cmp     BYTE[pieces], "R"
@@ -751,7 +751,7 @@ render:
     push    ebp
     mov     ebp, esp
 
-    sub     esp, 8
+    sub     esp, 12
     push    clear_screen_cmd
     call    system
     add     esp, 4
@@ -761,21 +761,15 @@ render:
     call    printf
     add     esp, 4
 
-    ; Prints the player turn indicator
-    cmp     BYTE[playerTurn], 1
-    je      turnBlack
-        push    frmt_turn_white
-        push    frmt_space27
-        call    printf
-        add     esp, 8
-        jmp     turn_print_end
-
-    turnBlack:
-    push    frmt_turn_black
+    ; prints the turn marker
+    mov     eax, 0
+    mov     al, BYTE[playerTurn]
+    shl     al, 1
+    lea     ebx, [frmt_turn_white+eax*8]
+    push    ebx
     push    frmt_space27
     call    printf
     add     esp, 8
-    turn_print_end:
 
     ;cmp     DWORD[errorflag], 0x69
     ;jne     errornext
@@ -795,210 +789,148 @@ render:
         x_loop_start:
         cmp     DWORD[ebp-8], WIDTH
         je      x_loop_end
-            print_board:
+            ; Colors the board
+            ; makes sure the color is within the board location
+            cmp     DWORD[ebp-8], TOPHORZ
+            jl      endprintboard
+            cmp     DWORD[ebp-8], ENDHORZ
+            jge     endprintboard
+            cmp     DWORD[ebp-4], TOPVERT
+            jl      endprintboard
+            cmp     DWORD[ebp-4], ENDVERT
+            jge     endprintboard
+                ; ((2*(row%2) + xpos%4)%4)/2 
+                ; this assigns a square either 0 or 1 to print color box
+                mov     ecx, DWORD[ebp-4]
+                sub     ecx, TOPVERT 
+                and     ecx, 0x1
+                shl     ecx, 1
+                mov     edx, DWORD[ebp-8]
+                sub     edx, TOPHORZ
+                and     edx, 0x3
+                add     ecx, edx
+                and     ecx, 0x3
 
-                ; Colors the board
-                cmp     DWORD[ebp-8], TOPHORZ
-                jl      endcolor
-                cmp     DWORD[ebp-8], ENDHORZ
-                jge     endcolor
-                cmp     DWORD[ebp-4], TOPVERT
-                jl      endcolor
-                cmp     DWORD[ebp-4], ENDVERT
-                jge     endcolor
-
-                    cmp     BYTE[selectFlag], 0x1
-                    jne     color1
-                        push    color_move
-                        call    printf
-                        add     esp, 4                
-                        mov     BYTE[selectFlag], 0x0
-                        jmp     endcolor
-
-                    color1:
-                    mov     ecx, DWORD[ebp-4]
-                    sub     ecx, TOPVERT 
-                    and     ecx, 0x1
-                    shl     ecx, 1
-                    mov     edx, DWORD[ebp-8]
-                    sub     edx, TOPHORZ
-                    and     edx, 0x3
-                    add     ecx, edx
-                    and     ecx, 0x3
-
-                    cmp     ecx, 2
-                    jge     color2
-                        push    color_white
-                        call    printf 
-                        add     esp, 4
-                        jmp     endcolor
-                    color2:
-                        push    color_black
-                        call    printf
-                        add     esp, 4
-                endcolor:
-
-                ; Gets the board character at the location
-                mov     eax, [ebp-4]
-                mov     ebx, WIDTH
-                mul     ebx
-                add     eax, [ebp-8]
-                mov     ebx, 0
-                mov     bl, BYTE[board+eax]
-
-                ; This sets all the special unicode board characters
-                cmp     bl, '?'
-                jne     notspecial0
-                    push    frmt_space
-                    call    printf
-                    add     esp, 4
-                    jmp     print_end3
-                notspecial0:
-                cmp     bl, '$'
-                jne     notspecial1
-                    push    color_edge
-                    call    printf
-                    add     esp, 4
-                    push    CORNUL
-                    push    frmt_unic
-                    jmp     print_end
-                notspecial1:
-                cmp     bl, '&'
-                jne     notspecial2
-                    push    color_edge
-                    call    printf
-                    add     esp, 4
-                    push    CORNUR
-                    push    frmt_unic
-                    jmp     print_end
-                notspecial2:
-                cmp     bl, '*'
-                jne     notspecial3
-                    push    color_edge
-                    call    printf
-                    add     esp, 4
-                    push    CORNLL
-                    push    frmt_unic
-                    jmp     print_end
-                notspecial3:
-                cmp     bl, '%'
-                jne     notspecial4
-                    push    color_edge
-                    call    printf
-                    add     esp, 4
-                    push    CORNLR
-                    push    frmt_unic
-                    jmp     print_end
-                notspecial4:
-                cmp     bl, '@'
-                jne     notspecial5
-                    push    color_edge
-                    call    printf
-                    add     esp, 4
-                    push    HORIZ
-                    push    frmt_unic
-                    jmp     print_end
-                notspecial5:
-                cmp     bl, '#'
-                jne     notspecial6
-                    push    color_edge
-                    call    printf
-                    add     esp, 4
-                    push    color_foreground2
-                    call    printf
-                    add     esp, 4
-                    push    VERT
-                    push    frmt_unic
-                    jmp     print_end
-                notspecial6:
-                cmp     bl, '^'
-                jne     notspecial7
-                    push    color_edge
-                    call    printf
-                    add     esp, 4
-                    push    frmt_space
-                    push    frmt_reg
-                    jmp     print_end 
-                notspecial7:
-
-                ; This sets the playing pieces
-                cmp     DWORD[ebp-8], TOPHORZ
-                jl      endpieces
-                cmp     DWORD[ebp-8], ENDHORZ
-                jge     endpieces
-                cmp     DWORD[ebp-4], TOPVERT
-                jl      endpieces
-                cmp     DWORD[ebp-4], ENDVERT
-                jge     endpieces
-
-                    mov     edx, DWORD[ebp-8]
-                    sub     edx, TOPHORZ
-
-                    test    edx, 1
-                    jnz     endpieces
-
-                    mov     ecx, DWORD[ebp-4]
-                    sub     ecx, TOPVERT
-                    shr     edx, 1
-                    shl     ecx, 3
-                    add     ecx, edx
-                    mov     DWORD[tmp], ecx
-
-    
-                    cmp     BYTE[markarr+ecx], "+"
-                    jne     selectedcolorend
-                        push    color_move
-                        call    printf
-                        add     esp, 4
-                        mov     BYTE[selectFlag], 0x1
-                    selectedcolorend: 
-
-                    ; prints the chess pieces and proper colors
-                    mov     ecx, DWORD[tmp]
-                    mov     edx, 0
-                    mov     dl, BYTE[pieces+ecx]
-                    
-                    cmp     edx, 97
-                    jge     render_white
-                    cmp     edx, 91
-                    jge     render_regular
-                    cmp     edx, 65
-                    jl      render_regular
-                        push    edx
-                        call    func_print_black_char
-                        add     esp, 4
-                        jmp     print_end2
-
-                    render_white:
-                        push    edx
-                        call    func_print_white_char
-                        add     esp, 4
-                        jmp     print_end2
-            
-                render_regular:
-                endpieces:
-
-                ; Default regular character
-                push    ebx     
-                call    putchar
-                add     esp, 4
-                jmp     print_end2
-            print_end:
-            call    printf
-            add     esp, 8
-            print_end2:
-
-            cmp     DWORD[ebp-8], ENDHORZ2
-            jne     print_end3
-                push    color_normal
+                ; does some stupid contiguous memory things to load proper color
+                shr     ecx, 1
+                or      cl, BYTE[selectFlag]
+                lea     edx, [color_square1+ecx*8]
+                push    edx
                 call    printf
                 add     esp, 4
-            print_end3:
 
+                shr     BYTE[selectFlag], 2
+
+                ; this will only print the character once in a square
+                mov     edx, DWORD[ebp-8]
+                sub     edx, TOPHORZ
+                test    edx, 1
+                jnz     endprintboard
+
+                ; edx will be 0-7
+                ; ecx will be location within the board
+                mov     ecx, DWORD[ebp-4]
+                sub     ecx, TOPVERT
+                shr     edx, 1
+                shl     ecx, 3
+                add     ecx, edx
+                mov     DWORD[ebp-12], ecx
+
+                ; sets the color is the square is to be highlighted
+                cmp     BYTE[markarr+ecx], "+"
+                jne     selectedcolorend
+                    push    color_move
+                    call    printf
+                    add     esp, 4
+                    mov     BYTE[selectFlag], 0x3
+                selectedcolorend: 
+
+                ; prints the chess pieces and proper colors
+                mov     ecx, DWORD[ebp-12]
+                mov     al, BYTE[pieces+ecx]
+
+                cmp     al, "-"
+                je      endprintboard
+
+                ; this converts the character to 14, 16, 6, 0, 15, 9
+                ; points to an array which redirects to the proper memory address for char
+                sub     al, 66
+                mov     ebx, 32
+                cdq
+                div     ebx
+                mov     ebx, 0
+                mov     bl, BYTE[memjumparr+edx]
+                lea     ecx, [eax*8]
+                shl     eax, 1
+                sub     ecx, eax
+                add     ebx, ecx
+                lea     ebx, [BPAWN+ebx*8]
+
+                ; prints either the char in black or white
+                mov     DWORD[ebp-12], ebx
+                shr     ecx, 2
+                lea     ebx, [color_black+ecx*8]
+                push    ebx
+                call    printf
+                add     esp, 4
+                mov     ebx, DWORD[ebp-12]
+                
+                ; prints the unicode chess piece
+                push    ebx
+                push    frmt_unic
+                call    printf
+                add     esp, 8
+                jmp     piece_end
+            endprintboard:
+
+            ; Gets the board character at the location
+            ; eax is offset from 0 to the current piece
+            ; bl is the piece itself
+            mov     eax, [ebp-4]
+            mov     ebx, WIDTH
+            mul     ebx
+            add     eax, [ebp-8]
+            mov     ebx, 0
+            mov     bl, BYTE[board+eax]
+            mov     DWORD[ebp-12], ebx
+
+            ; This sets all the special unicode board characters
+            cmp     bl, "M"
+            jl      endspecial
+            cmp     bl, "S"
+            jg      endspecial
+
+            push    color_edge
+            call    printf
+            add     esp, 4
+
+            push    color_white
+            call    printf
+            add     esp, 4
+
+            mov     ebx, DWORD[ebp-12]
+            sub     ebx, 77
+            lea     eax, [VERT+ebx*8]
+            push    eax
+            push    frmt_unic
+            call    printf
+            add     esp, 8
+            jmp     piece_end
+            endspecial:
+            
+            ; Default regular character
+            push    ebx     
+            call    putchar
+            add     esp, 4
+
+            piece_end:
+            push    color_normal
+            call    printf
+            add     esp, 4
         inc     DWORD[ebp-8]
         jmp     x_loop_start
-        x_loop_end:
 
+        x_loop_end:
         push    0x0d
         call    putchar
         add     esp, 4
@@ -1017,6 +949,7 @@ render:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; int calc_square (pos x, pos y, offset x, offset y)
 calc_square:
     push    ebp
@@ -1054,6 +987,7 @@ calc_square:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void clearmoves() - clears the possible moves array
 clearmoves:
     push    ebp
@@ -1071,6 +1005,7 @@ clearmoves:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void processlines(increment x, increment y, opponent marker (A or a))
 processlines:
     push    ebp
@@ -1131,6 +1066,7 @@ processlines:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void processknight (opponent marker (A or a))
 processknight:
     push    ebp
@@ -1187,6 +1123,7 @@ processknight:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void processmove (offset x, offset y, opponent marker (A or a))
 processmove:
     push    ebp
@@ -1221,6 +1158,7 @@ processmove:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void processrook (opponent marker (A or a))
 processrook:
     push    ebp
@@ -1253,6 +1191,7 @@ processrook:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void processpawn (opponent marker (A or a))
 processpawn:
     push    ebp
@@ -1311,6 +1250,7 @@ processpawn:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; int processpawn2 (offset x, offset y, opponent marker (A or a))
 processpawn2:
     push    ebp
@@ -1358,6 +1298,7 @@ processpawn2:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void processbishop (opponent marker (A or a))
 processbishop:
     push    ebp
@@ -1390,6 +1331,7 @@ processbishop:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void processking (opponent marker (A or a))
 processking:
     push    ebp
@@ -1471,6 +1413,7 @@ processking:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; int convertpoint ()
 convertpoint:
     push    ebp
@@ -1522,6 +1465,7 @@ convertpoint:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; int calcnumbmoves ()
 calcnumbmoves:
     push    ebp
@@ -1547,101 +1491,8 @@ calcnumbmoves:
 
     mov     esp, ebp
     pop     ebp
-
-    ret
-; void func_print_black_char (char a)
-func_print_black_char:
-    push    ebp
-    mov     ebp, esp
-
-    push    color_foreground
-    call    printf
-    add     esp, 4
-
-    cmp     DWORD[ebp+8], "R"
-    jne     p_next1
-        push    BROOK
-        jmp     print_black_end
-    p_next1:
-    cmp     DWORD[ebp+8], "H"
-    jne     p_next2
-        push    BKNIGHT
-        jmp     print_black_end
-    p_next2:
-    cmp     DWORD[ebp+8], "B"
-    jne     p_next3
-        push    BBISH
-        jmp     print_black_end
-    p_next3:
-    cmp     DWORD[ebp+8], "K"
-    jne     p_next4
-        push    BKING
-        jmp     print_black_end
-    p_next4:
-    cmp     DWORD[ebp+8], "Q"
-    jne     p_next5
-        push    BQUEEN
-        jmp     print_black_end
-    p_next5:
-    cmp     DWORD[ebp+8], "P"
-    jne     print_black_end
-        push    BPAWN
-
-    print_black_end:
-    push    frmt_unic
-    call    printf
-    add     esp, 8
-
-    mov     esp, ebp
-    pop     ebp
     ret
 
-; void func_print_white_char (char a)
-func_print_white_char:
-    push    ebp
-    mov     ebp, esp
-
-    push    color_foreground2
-    call    printf
-    add     esp, 4
-
-    cmp     DWORD[ebp+8], "r"
-    jne     p_next6
-        push    WROOK
-        jmp     print_white_end
-    p_next6:
-    cmp     DWORD[ebp+8], "h"
-    jne     p_next7
-        push    WKNIGHT
-        jmp     print_white_end
-    p_next7:
-    cmp     DWORD[ebp+8], "b"
-    jne     p_next8
-        push    WBISH
-        jmp     print_white_end
-    p_next8:
-    cmp     DWORD[ebp+8], "k"
-    jne     p_next9
-        push    WKING
-        jmp     print_white_end
-    p_next9:
-    cmp     DWORD[ebp+8], "q"
-    jne     p_next10
-        push    WQUEEN
-        jmp     print_white_end
-    p_next10:
-    cmp     DWORD[ebp+8], "p"
-    jne     print_white_end
-        push    WPAWN
-
-    print_white_end:
-    push    frmt_unic
-    call    printf
-    add     esp, 8
-
-    mov     esp, ebp
-    pop     ebp
-    ret
 ; void func_print_captured ()
 func_print_captured:
     push    ebp
@@ -1784,6 +1635,7 @@ fill_capture:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void render_intro()
 render_intro:
     push    ebp
@@ -1853,6 +1705,7 @@ render_intro:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void init_intro(int a)
 init_intro:
     push    ebp
@@ -1923,34 +1776,21 @@ save_intro:
     lea     esi, [save_file]
     lea     edi, [pieces]
 
-    sub     esp, 8
+    sub     esp, 4
+
     push    mode_r
     push    esi
     call    fopen
     add     esp, 8
     mov     DWORD[ebp-4], eax
 
-    mov     DWORD[ebp-8], 0
-    save_read_loop:
-    cmp     DWORD[ebp-8], 8
-    je      save_read_loop_end
-        mov     eax, 8
-        mul     DWORD [ebp-8]
-        lea     ebx, [edi+eax] 
-
-        push    DWORD[ebp-4]
-        push    8
-        push    1
-        push    ebx
-        call    fread
-        add     esp, 16
-
-        push    DWORD[ebp-4]
-        call    fgetc
-        add     esp, 4
-    inc     DWORD[ebp-8]
-    jmp     save_read_loop
-    save_read_loop_end:
+    ; loads in the pieces array
+    push    DWORD[ebp-4]
+    push    64
+    push    1
+    push    edi
+    call    fread
+    add     esp, 16
 
     ; loads in saved capture data for white
     lea     ebx, [captureW]
@@ -1986,18 +1826,19 @@ save_intro:
     call    fclose
     add     esp, 4
 
+    mov     DWORD[xyposLast1], -1
+
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void save_current ()
 save_current:
     push    ebp
     mov     ebp, esp
 
-    sub     esp, 8
+    sub     esp, 4
     lea     esi, [save_file]
-    mov     DWORD[ebp-8], 0
-    mov     BYTE[tmp], 10
 
     push    mode_w
     push    esi
@@ -2006,27 +1847,13 @@ save_current:
     mov     DWORD[ebp-4], eax
 
     ; writes the board to the file
-    save_write_loop:
-    cmp     DWORD[ebp-8], 8
-    je      save_write_end
-        mov     ecx, DWORD[ebp-8]
-        lea     ebx, [pieces+8*ecx]
-        push    DWORD[ebp-4]
-        push    8
-        push    1
-        push    ebx
-        call    fwrite
-        add     esp, 16
-
-        push    DWORD[ebp-4]
-        push    1
-        push    1
-        push    tmp
-        call    fwrite
-        add     esp, 16
-    inc     DWORD[ebp-8]
-    jmp     save_write_loop
-    save_write_end:
+    lea     ebx, [pieces]
+    push    DWORD[ebp-4]
+    push    64
+    push    1
+    push    ebx
+    call    fwrite
+    add     esp, 16
 
     lea     ebx, [captureW]
     push    DWORD[ebp-4]
@@ -2051,4 +1878,5 @@ save_current:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; vim:ft=nasm
