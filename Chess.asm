@@ -1,20 +1,19 @@
-%include "/usr/local/share/csc314/asm_io.inc"
 %define BOARD_FILE 'media/board.txt'
 %define INTRO_FILE 'media/intro.txt'
 %define STRUC_FILE 'media/instructions.txt'
 %define SAVE_FILE  'saves/saves.txt'
 %define INIT_FILE  'media/.init'
-%define EXITCHAR 'x'
-%define BACKCHAR 'z'
-%define UNDOCHAR 'u'
-%define HEIGHT   15
-%define WIDTH    72 
-%define TOPVERT  4  
-%define TOPHORZ  25
-%define ENDVERT  12
-%define ENDHORZ  41 
-%define ENDHORZ2 42
-%define TURNLOC  99
+%define EXITCHAR   'x'
+%define BACKCHAR   'z'
+%define UNDOCHAR   'u'
+%define HEIGHT     15
+%define WIDTH      72 
+%define TOPVERT    4  
+%define TOPHORZ    25
+%define ENDVERT    12
+%define ENDHORZ    41 
+%define ENDHORZ2   42
+%define TURNLOC    99
 
 segment .data
     board_file          db  BOARD_FILE, 0
@@ -107,8 +106,7 @@ segment .bss
     inCheck     resb    2
 
 segment .text
-	global  asm_main
-    global  render
+	global  main
 
     extern  system
     extern  putchar
@@ -123,7 +121,7 @@ segment .text
     extern  setlocale
 
 ; main()
-asm_main:
+main:
     enter   0, 0
     pusha
 	; ********** CODE STARTS HERE **********
