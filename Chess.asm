@@ -1,4 +1,4 @@
-;%include "/usr/local/share/csc314/asm_io.inc"
+%include "/usr/local/share/csc314/asm_io.inc"
 %define BOARD_FILE 'media/board.txt'
 %define INTRO_FILE 'media/intro.txt'
 %define STRUC_FILE 'media/instructions.txt'
@@ -1762,30 +1762,32 @@ processlinescheck:
         n_check:
         mov     ebx, DWORD[ebp-4]
         add     ebx, DWORD[ebp-8]
-        test    bl, 1
-        jz      checkstraight
-        jmp     checkdiagonal
+        xor     ecx, ecx
+        ;test    bl, 1
+        ;jz      checkdiagonal
+        ;jmp     checkstraight
 
-        checkdiagonal:
+        ;checkdiagonal:
         mov     cl, "q"
-        sub     cl, BYTE[ebp+16]
-        cmp     BYTE[pieces+eax], cl
-        je      needcheck
-
-        mov     cl, "r"
-        sub     cl, BYTE[ebp+16]
-        cmp     BYTE[pieces+eax],cl
-        je      needcheck
-        jmp     botprocesscheck
-
-        checkstraight:
-        mov     cl, "q"
-        sub     cl, BYTE[ebp+16]
+        sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax], cl
         je      needcheck
 
         mov     cl, "b"
-        sub     cl, BYTE[ebp+16]
+        sub     ecx, DWORD[ebp+16]
+        cmp     BYTE[pieces+eax],cl
+        je      needcheck
+        jmp     botprocesscheck
+
+        ;checkstraight:
+    ;dump_regs 1
+        ;mov     cl, "q"
+        ;sub     ecx, DWORD[ebp+16]
+        ;cmp     BYTE[pieces+eax], cl
+        ;je      needcheck
+
+        mov     cl, "r"
+        sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax], cl
         je      needcheck
 
@@ -1851,7 +1853,7 @@ bwcalc_check:
     bot_bcheck:
     mov     DWORD[ebp-12], eax
 
-    ; processes the king's move square
+    ; process lines to pieces
     mov     DWORD[ebp-4], 1
     check_loop_top:
     cmp     DWORD[ebp-4], -2
