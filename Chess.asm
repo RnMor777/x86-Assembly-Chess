@@ -1761,11 +1761,7 @@ processlinescheck:
         mov     ebx, DWORD[ebp-4]
         add     ebx, DWORD[ebp-8]
         xor     ecx, ecx
-        ;test    bl, 1
-        ;jz      checkdiagonal
-        ;jmp     checkstraight
 
-        ;checkdiagonal:
         mov     cl, "q"
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax], cl
@@ -1776,13 +1772,6 @@ processlinescheck:
         cmp     BYTE[pieces+eax],cl
         je      needcheck
         jmp     botprocesscheck
-
-        ;checkstraight:
-    ;dump_regs 1
-        ;mov     cl, "q"
-        ;sub     ecx, DWORD[ebp+16]
-        ;cmp     BYTE[pieces+eax], cl
-        ;je      needcheck
 
         mov     cl, "r"
         sub     ecx, DWORD[ebp+16]
