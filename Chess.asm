@@ -590,6 +590,23 @@ main:
         add     esp, 4
 
         call    clearmoves
+
+        cmp     BYTE[inCheck], 0
+        je      skip_mate
+            push    0 
+            call    procCheckmate
+            add     esp, 4
+        skip_mate:
+        cmp     BYTE[inCheck+1], 0
+        je      skip_mate2
+            push    32
+            call    procCheckmate
+            add     esp, 4
+        skip_mate2:
+
+        ;cmp     DWORD[errorflag], 0xAA
+        ;je      game_loop_end
+
         jmp     game_loop
     game_loop_end:
 
@@ -840,6 +857,14 @@ render:
         add     esp, 8
         mov     DWORD[errorflag], 0
     err_next3:
+    cmp     DWORD[errorflag], 0xAA
+    jne     err_next4
+        push    frmt_saved
+        push    frmt_spacesave
+        call    printf
+        add     esp, 8
+        mov     DWORD[errorflag], 0
+    err_next4:
 
     push    newline
     call    printf
@@ -1771,7 +1796,6 @@ processlinescheck:
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax],cl
         je      needcheck
-        jmp     botprocesscheck
 
         mov     cl, "r"
         sub     ecx, DWORD[ebp+16]
@@ -2082,6 +2106,57 @@ procTurns:
         jmp     proc_turn_end
     proc_turn_end:
     mov     ebx, DWORD[ebp+8]
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+; void procCheckmate(int player)
+procCheckmate:
+    push    ebp
+    mov     ebp, esp
+
+    sub     esp, 4
+    mov     DWORD[ebp-4], 0
+
+    top_mate_loop:
+    cmp     DWORD[ebp-4], 64
+    je      end_mate_loop
+        mov     DWORD[errorflag], 0
+        mov     ecx, DWORD[ebp-4]
+        mov     eax, DWORD[ebp+8]
+        add     eax, "Z"
+        xor     ebx, ebx
+        mov     bl, BYTE[pieces+ecx]
+        sub     eax, ebx
+
+        cmp     eax, 0
+        jl      bot_mate_loop
+        cmp     eax, 26
+        jg      bot_mate_loop
+
+            xor     BYTE[playerTurn], 1
+            push    ebx
+            call    procTurns
+            add     esp, 4
+
+            call    sieve_check
+            xor     BYTE[playerTurn], 1
+
+            call    calcnumbmoves
+            cmp     DWORD[errorflag], 0x69 
+            jne     not_mate
+
+            call    clearmoves
+
+    bot_mate_loop:
+    inc     DWORD[ebp-4]
+    jmp     top_mate_loop
+    end_mate_loop: 
+
+    mov     DWORD[errorflag], 0xAA
+    not_mate:
+
+    call    clearmoves
 
     mov     esp, ebp
     pop     ebp
