@@ -23,10 +23,10 @@ Features Include:
  * Captured piece tracking
  * Turn system
  * Ability to save and load a game
+ * Check and Checkmate detection and movement 
 
-Things to implement:
- * Checking/Checkmate 
- * AI?
+Glitches:
+* Castling will probably allow you to castle out of, or through check
 
 # Screenshots
 
