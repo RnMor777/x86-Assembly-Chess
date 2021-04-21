@@ -63,13 +63,15 @@ segment .data
     frmt_space18        db  "%54s", 0
     frmt_spacesave      db  "%36s", 0
     frmt_spacecheck     db  "%42s", 0
+    frmt_spacemate      db  "%46s", 0
     frmt_print          db  "Enter a move: ", 0
     frmt_print2         db  "Enter a destination: ", 0
     frmt_bcheck         db  "Black in Check", 10, 13, 0
     frmt_wcheck         db  "White in Check", 10, 13, 0
-    error_moves         db  "No moves for piece",10, 13, 0
     frmt_turn           db  "White",0,0,0,"Black"
     frmt_saved          db  "Saved",0
+    frmt_mate           db  "Checkmate - Game Over!", 10, 13, 0
+    frmt_again          db  "Play again? (y/n): ", 0
     frmt_instructions   db  "u - undo, z - back, x - exit, s - save",10,13,0
     frmt_capture1       db  " Captured by white: ", 0
     frmt_capture2       db  " Captured by black: ", 0
@@ -107,7 +109,6 @@ segment .bss
 
 segment .text
 	global  main
-
     extern  system
     extern  putchar
     extern  getchar
@@ -145,29 +146,7 @@ main:
     call    setlocale
     add     esp, 8
 
-    ; sets up initial game settings and placements
     call    seed_start
-    call    clearmoves
-
-    mov     BYTE[playerTurn], 0
-    mov     DWORD[xyposLast1], -1
-    mov     BYTE[inCheck], 0
-    mov     BYTE[inCheck+1], 0
-    mov     BYTE[captureW], 0
-    mov     BYTE[captureW+1], 0
-    mov     BYTE[captureW+2], 0
-    mov     BYTE[captureW+3], 0
-    mov     BYTE[captureW+4], 0
-    mov     BYTE[captureB], 0
-    mov     BYTE[captureB+1], 0
-    mov     BYTE[captureB+2], 0
-    mov     BYTE[captureB+3], 0
-    mov     BYTE[captureB+4], 0
-    mov     BYTE[canCastleW], 1
-    mov     BYTE[canCastleW+1], 1
-    mov     BYTE[canCastleB], 1
-    mov     BYTE[canCastleB+1], 1
-    mov     BYTE[wasCastle], 0
 
     ; runs the initial start screen
     start_intro:
@@ -196,6 +175,7 @@ main:
     je      game_loop_end
     jmp     start_intro
 
+    ; loads a saved game
     game_load:
         call    save_intro
         jmp     game_bottom
@@ -241,7 +221,7 @@ main:
         mov     eax, 0
         mov     al, BYTE[userin]
         cmp     al, EXITCHAR
-        je      game_loop_end
+        je      again_loop_end
 
         ; Just clears the board
         cmp     al, BACKCHAR
@@ -604,11 +584,30 @@ main:
             add     esp, 4
         skip_mate2:
 
-        ;cmp     DWORD[errorflag], 0xAA
-        ;je      game_loop_end
+        cmp     DWORD[errorflag], 0xAA
+        je      game_loop_end
 
         jmp     game_loop
     game_loop_end:
+
+    again_loop:
+        call    render
+        push    frmt_again
+        call    printf
+        add     esp, 4
+        push    userin
+        push    frmt_reg
+        call    scanf
+        add     esp, 8
+    cmp     BYTE[userin], "y"
+    je      start_game
+    cmp     BYTE[userin], "n"
+    je      again_loop_end
+    jmp     again_loop
+    start_game:
+        call    seed_start
+        jmp     game_loop
+    again_loop_end:
 
 	; *********** CODE ENDS HERE ***********
     popa
@@ -635,6 +634,31 @@ seed_start:
     push    edi
     call    fread
     add     esp, 16
+
+    mov     BYTE[playerTurn], 0
+    mov     DWORD[xyposLast1], -1
+    mov     BYTE[inCheck], 0
+    mov     BYTE[inCheck+1], 0
+    mov     BYTE[captureW], 0
+    mov     BYTE[captureW+1], 0
+    mov     BYTE[captureW+2], 0
+    mov     BYTE[captureW+3], 0
+    mov     BYTE[captureW+4], 0
+    mov     DWORD[captureB], 0
+    mov     BYTE[captureB+4], 0
+    ;mov     BYTE[captureB], 0
+    ;mov     BYTE[captureB+1], 0
+    ;mov     BYTE[captureB+2], 0
+    ;mov     BYTE[captureB+3], 0
+    ;mov     BYTE[captureB+4], 0
+    mov     BYTE[canCastleW], 1
+    mov     BYTE[canCastleW+1], 1
+    mov     BYTE[canCastleB], 1
+    mov     BYTE[canCastleB+1], 1
+    mov     BYTE[wasCastle], 0
+    mov     DWORD[errorflag], 0 
+
+    call    clearmoves
 
     mov     esp, ebp
     pop     ebp
@@ -835,13 +859,21 @@ render:
     jmp     y_loop_start
     y_loop_end:
 
-    cmp     BYTE[inCheck], 1
+    cmp     DWORD[errorflag], 0xAA
     jne     err_next
+        push    frmt_mate
+        push    frmt_spacemate
+        call    printf
+        add     esp, 8
+        jmp     err_next3
+    err_next:
+    cmp     BYTE[inCheck], 1
+    jne     err_next1
         push    frmt_bcheck
         push    frmt_spacecheck
         call    printf
         add     esp, 8
-    err_next:
+    err_next1:
     cmp     BYTE[inCheck+1], 1
     jne     err_next2
         push    frmt_wcheck
@@ -857,21 +889,11 @@ render:
         add     esp, 8
         mov     DWORD[errorflag], 0
     err_next3:
-    cmp     DWORD[errorflag], 0xAA
-    jne     err_next4
-        push    frmt_saved
-        push    frmt_spacesave
-        call    printf
-        add     esp, 8
-        mov     DWORD[errorflag], 0
-    err_next4:
 
     push    newline
     call    printf
     add     esp, 4
-
     call    func_print_captured
-
     push    newline
     call    printf
     add     esp, 4
@@ -2117,12 +2139,25 @@ procCheckmate:
 
     sub     esp, 4
     mov     DWORD[ebp-4], 0
+    call    clearmoves
 
     top_mate_loop:
     cmp     DWORD[ebp-4], 64
     je      end_mate_loop
+        ; resets variable errorflag
         mov     DWORD[errorflag], 0
+
+        ; sets the xyposcur, xpos, and ypos for processing the turns
         mov     ecx, DWORD[ebp-4]
+        mov     DWORD[xyposCur], ecx
+        mov     eax, ecx
+        cdq
+        mov     ebx, 8
+        div     ebx
+        mov     DWORD[xpos], edx
+        mov     DWORD[ypos], eax
+
+        ; moves the piece into ebx and finds difference between that and "Z"+piece
         mov     eax, DWORD[ebp+8]
         add     eax, "Z"
         xor     ebx, ebx
@@ -2134,14 +2169,15 @@ procCheckmate:
         cmp     eax, 26
         jg      bot_mate_loop
 
-            xor     BYTE[playerTurn], 1
+            ; process the turn for that char
             push    ebx
             call    procTurns
             add     esp, 4
 
+            ; removes moves that could be used
             call    sieve_check
-            xor     BYTE[playerTurn], 1
 
+            ; calculates the amount of remaining moves
             call    calcnumbmoves
             cmp     DWORD[errorflag], 0x69 
             jne     not_mate
@@ -2155,7 +2191,6 @@ procCheckmate:
 
     mov     DWORD[errorflag], 0xAA
     not_mate:
-
     call    clearmoves
 
     mov     esp, ebp
