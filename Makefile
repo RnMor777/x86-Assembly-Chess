@@ -4,5 +4,5 @@ all: Chess
 
 Chess: Chess.asm
 	nasm -f elf -F dwarf -g Chess.asm
-	gcc -g -m32 -o Chess Chess.o
+	gcc -g -m32 -o Chess Chess.o -static
 	rm -rf Chess.o

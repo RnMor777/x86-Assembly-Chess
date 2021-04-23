@@ -400,7 +400,6 @@ main:
                 mov     BYTE[canCastleB], 0
                 mov     BYTE[canCastleB+1], 0
                 jmp     next_castle2
-
             next_castle2:
             cmp     BYTE[pieces], "R"
             je      next_castle3
@@ -424,6 +423,7 @@ main:
             je      upper_castle
             cmp     dl, "k"
             je      lower_castle
+            mov     BYTE[wasCastle], 0
             jmp     end_castle_func
 
             upper_castle:
@@ -639,18 +639,10 @@ seed_start:
     mov     DWORD[xyposLast1], -1
     mov     BYTE[inCheck], 0
     mov     BYTE[inCheck+1], 0
-    mov     BYTE[captureW], 0
-    mov     BYTE[captureW+1], 0
-    mov     BYTE[captureW+2], 0
-    mov     BYTE[captureW+3], 0
+    mov     DWORD[captureW], 0
     mov     BYTE[captureW+4], 0
     mov     DWORD[captureB], 0
     mov     BYTE[captureB+4], 0
-    ;mov     BYTE[captureB], 0
-    ;mov     BYTE[captureB+1], 0
-    ;mov     BYTE[captureB+2], 0
-    ;mov     BYTE[captureB+3], 0
-    ;mov     BYTE[captureB+4], 0
     mov     BYTE[canCastleW], 1
     mov     BYTE[canCastleW+1], 1
     mov     BYTE[canCastleB], 1
