@@ -319,6 +319,7 @@ main:
         game_next:
 
         call    sieve_check
+        call    sieve_castle
 
         ; Calculates the number of moves for the selected piece
         call    calcnumbmoves
@@ -1284,6 +1285,7 @@ processking:
         cmp     BYTE[pieces+58], "-"
         jne     wkingside
         cmp     BYTE[pieces+59], "-"
+        jne     wkingside
             mov     BYTE[markarr+58], "+"
 
         wkingside:
@@ -2184,6 +2186,35 @@ procCheckmate:
     mov     DWORD[errorflag], 0xAA
     not_mate:
     call    clearmoves
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+; void sieve_castle ()
+sieve_castle:
+    push    ebp
+    mov     ebp, esp
+
+    mov     ebx, DWORD[xyposCur]
+    xor     eax, eax
+    mov     al, BYTE[pieces+ebx]
+    sub     eax, 91
+
+    cdq
+    xor     eax, edx
+    sub     eax, edx
+
+    cmp     eax, 16
+    jne     end_castle_sieve
+        cmp     BYTE[markarr+ebx+1], ""
+        jne     next_c_s
+            mov     BYTE[markarr+ebx+2], "" 
+        next_c_s:
+        cmp     BYTE[markarr+ebx-1], ""
+        jne     next_c_s2
+            mov     BYTE[markarr+ebx-2], ""
+        next_c_s2:
+    end_castle_sieve:
 
     mov     esp, ebp
     pop     ebp
