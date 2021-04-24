@@ -127,25 +127,12 @@ main:
     pusha
 	; ********** CODE STARTS HERE **********
 
-    ; scans in all of the files
-    push    1
+    ; scans in all of the files, sets up unicode, and defaults
     call    init_intro    	
-    add     esp, 4
-
-    push    2 
-    call    init_intro
-    add     esp, 4
-
-    push    3
-    call    init_intro
-    add     esp, 4
-
-    ; sets up unicode support
     push    frmt_locale
     push    0x6
     call    setlocale
     add     esp, 8
-
     call    seed_start
 
     ; runs the initial start screen
@@ -172,7 +159,7 @@ main:
     cmp     bl, '3'
     je      game_load      
     cmp     bl, '4'
-    je      game_loop_end
+    je      again_loop_end
     jmp     start_intro
 
     ; loads a saved game
@@ -203,8 +190,8 @@ main:
 
     jmp     start_intro
 
+    ; actual game start
     game_loop:
-        ; prints the game board
         call    render
         call    clearmoves
 
@@ -218,7 +205,6 @@ main:
         add     esp, 8
     
         ; Exit function by entering an x
-        mov     eax, 0
         mov     al, BYTE[userin]
         cmp     al, EXITCHAR
         je      again_loop_end
@@ -273,14 +259,8 @@ main:
             mov     BYTE[pieces+62], "-"
 
             botundocastle:
-            mov     bl, BYTE[prevCastle]
-            mov     BYTE[canCastleW], bl
-            mov     bl, BYTE[prevCastle+1]
-            mov     BYTE[canCastleW+1], bl
-            mov     bl, BYTE[prevCastle+2]
-            mov     BYTE[canCastleB], bl
-            mov     bl, BYTE[prevCastle+3]
-            mov     BYTE[canCastleB+1], bl
+            mov     ebx, DWORD[prevCastle]
+            mov     DWORD[canCastleW], ebx
             endundocastle:
 
             mov     edx, 0
@@ -303,7 +283,6 @@ main:
 
         ; Converts the entered points into integer values in the array
         call    convertpoint
-
         cmp     eax, 0x420
         je      game_bottom
 
@@ -338,31 +317,25 @@ main:
         call    scanf
         add     esp, 8
 
-        mov     eax, 0
-        mov     al, BYTE[userin]
-
         ; Just clears the board
-        cmp     al, BACKCHAR
+        cmp     BYTE[userin], BACKCHAR
         je      game_bottom
 
         ; Converts the entered points into integer values in the array
         call    convertpoint
-
         cmp     eax, 0x420
         je      game_next
 
         mov     ecx, eax
-        xor     ebx, ebx
         mov     bl, BYTE[markarr+eax]
-
         mov     eax, DWORD[xyposCur]
 
         ; Does the moving of the pieces
         cmp     bl, "+"
         jne     game_next
-            ; Moves the game piece
             ; dl is the current moving piece
             ; bl is the character being overwritten
+            xor     edx, edx
             mov     dl, BYTE[pieces+eax] 
             mov     bl, BYTE[pieces+ecx]
             mov     BYTE[pieces+ecx], dl
@@ -376,31 +349,18 @@ main:
             ; Changes the player turn marker
             xor     BYTE[playerTurn], 1
 
-            ; Castling Function
             ; Stores current castle info 
-            mov     esi, ebx
-            mov     bl, BYTE[canCastleW]
-            mov     BYTE[prevCastle], bl
-            mov     bl, BYTE[canCastleW+1]
-            mov     BYTE[prevCastle+1], bl
-            mov     bl, BYTE[canCastleB]
-            mov     BYTE[prevCastle+2], bl
-            mov     bl, BYTE[canCastleB+1]
-            mov     BYTE[prevCastle+3], bl
-            mov     ebx, esi
+            mov     esi, DWORD[canCastleW]
+            mov     DWORD[prevCastle], esi
 
-            ; Changes castling information depending on move piece
+            ; Changes castling information on piece movement
             cmp     dl, "k"
             jne     next_castle
-                mov     BYTE[canCastleW], 0
-                mov     BYTE[canCastleW+1], 0
-                jmp     next_castle2
+                mov     WORD[canCastleW], 0
             next_castle:
             cmp     dl, "K"
             jne     next_castle2
-                mov     BYTE[canCastleB], 0
-                mov     BYTE[canCastleB+1], 0
-                jmp     next_castle2
+                mov     WORD[canCastleB], 0
             next_castle2:
             cmp     BYTE[pieces], "R"
             je      next_castle3
@@ -421,53 +381,43 @@ main:
 
             ; Does the castling
             cmp     dl, "K"
-            je      upper_castle
+            je      castle_move
             cmp     dl, "k"
-            je      lower_castle
+            je      castle_move
             mov     BYTE[wasCastle], 0
             jmp     end_castle_func
-
-            upper_castle:
+    
+            castle_move:
             mov     esi, ecx
             sub     esi, eax
-
+            sub     dl, "K"
+            mov     al, dl
+            xor     al, 32
+            mov     cl, "r"
+            sub     cl, al
+            shr     al, 4
+            shr     dl, 5
+            xor     al, 2
+            imul    edx, 56
                 cmp     esi, -2
-                je      upper_castle_queen
+                je      castle_queen
                 cmp     esi, 2
-                je      upper_castle_king
+                je      castle_king
                 jmp     end_castle_func
-
-                upper_castle_queen:
-                mov     BYTE[pieces+3], "R"
-                mov     BYTE[pieces+0], "-"
+            
+                castle_queen:
+                mov     BYTE[pieces+edx], "-"
+                mov     BYTE[pieces+edx+3], cl
                 mov     BYTE[wasCastle], 1
+                add     BYTE[wasCastle], al
                 jmp     end_castle_func
 
-                upper_castle_king:
-                mov     BYTE[pieces+5], "R"
-                mov     BYTE[pieces+7], "-"
+                castle_king:
+                mov     BYTE[pieces+edx+5], cl
+                mov     BYTE[pieces+edx+7], "-"
                 mov     BYTE[wasCastle], 2
-            jmp     end_castle_func
-            lower_castle:
-            mov     esi, ecx
-            sub     esi, eax
-                cmp     esi, -2
-                je      lower_castle_queen
-                cmp     esi, 2
-                je      lower_castle_king
+                add     BYTE[wasCastle], al
                 jmp     end_castle_func
-
-                lower_castle_queen:
-                mov     BYTE[pieces+59], "r"
-                mov     BYTE[pieces+56], "-"
-                mov     BYTE[wasCastle], 3
-                jmp     end_castle_func
-
-                lower_castle_king:
-                mov     BYTE[pieces+61], "r"
-                mov     BYTE[pieces+63], "-"
-                mov     BYTE[wasCastle], 4
-
             end_castle_func:
 
             ; Keeps track of captured pieces
@@ -587,7 +537,6 @@ main:
 
         cmp     DWORD[errorflag], 0xAA
         je      game_loop_end
-
         jmp     game_loop
     game_loop_end:
 
@@ -638,16 +587,12 @@ seed_start:
 
     mov     BYTE[playerTurn], 0
     mov     DWORD[xyposLast1], -1
-    mov     BYTE[inCheck], 0
-    mov     BYTE[inCheck+1], 0
+    mov     WORD[inCheck], 0
     mov     DWORD[captureW], 0
     mov     BYTE[captureW+4], 0
     mov     DWORD[captureB], 0
     mov     BYTE[captureB+4], 0
-    mov     BYTE[canCastleW], 1
-    mov     BYTE[canCastleW+1], 1
-    mov     BYTE[canCastleB], 1
-    mov     BYTE[canCastleB+1], 1
+    mov     DWORD[canCastleW], 0x01010101
     mov     BYTE[wasCastle], 0
     mov     DWORD[errorflag], 0 
 
@@ -1157,8 +1102,6 @@ processpawn:
     call    processpawn2
     add     esp, 12
 
-    ; Check en passant?
-    
     mov     esp, ebp
     pop     ebp
     ret
@@ -1271,56 +1214,32 @@ processking:
         dec     DWORD[ebp-4]
         jmp     top_proc_king
     end_proc_king:
-    
-    ; Check for castling
-    cmp     DWORD[ebp+8], "A"
-    jne     blackCastle
-        cmp     BYTE[canCastleW], 1
-        je      wqueenside
-        jmp     wkingside
 
-        wqueenside:
-        cmp     BYTE[pieces+57], "-"
-        jne     wkingside
-        cmp     BYTE[pieces+58], "-"
-        jne     wkingside
-        cmp     BYTE[pieces+59], "-"
-        jne     wkingside
-            mov     BYTE[markarr+58], "+"
+    ; checks for castling
+    mov     eax, DWORD[ebp+8]
+    sub     eax, "A"
+    shr     eax, 5
+    mov     ebx, eax
+    xor     ebx, 1
+    imul    ebx, 7
 
-        wkingside:
-        cmp     BYTE[canCastleW+1], 1
+    cmp     BYTE[canCastleW+(eax*2)], 1
+    jne     kingside
+        cmp     BYTE[pieces+(ebx*8)+1], "-"
+        jne     kingside
+        cmp     BYTE[pieces+(ebx*8)+2], "-"
+        jne     kingside
+        cmp     BYTE[pieces+(ebx*8)+3], "-"
+        jne     kingside
+            mov     BYTE[markarr+(ebx*8)+2], "+" 
+    kingside:
+        cmp     BYTE[canCastleW+(eax*2)+1], 1
         jne     endCastle
-
-        cmp     BYTE[pieces+61], "-"
-        jne     endCastle
-        cmp     BYTE[pieces+62], "-"
-        jne     endCastle
-            mov     BYTE[markarr+62], "+"
-        jmp     endCastle
-    blackCastle:
-        cmp     BYTE[canCastleB], 1
-        je      bqueenside
-        jmp     bkingside
-        
-        bqueenside:
-        cmp     BYTE[pieces+1], "-"
-        jne     bkingside
-        cmp     BYTE[pieces+2], "-"
-        jne     bkingside
-        cmp     BYTE[pieces+3], "-"
-        jne     bkingside
-            mov     BYTE[markarr+2], "+"
-
-        bkingside:
-        cmp     BYTE[canCastleB+1], 1
-        jne     endCastle
-
-        cmp     BYTE[pieces+5], "-"
-        jne     endCastle
-        cmp     BYTE[pieces+6], "-"
-        jne     endCastle
-            mov     BYTE[markarr+6], "+"
+            cmp     BYTE[pieces+(ebx*8)+5], "-"
+            jne     endCastle
+            cmp     BYTE[pieces+(ebx*8)+6], "-"
+            jne     endCastle
+                mov     BYTE[markarr+(ebx*8)+6], "+"
     endCastle:
 
     mov     esp, ebp
@@ -1568,7 +1487,6 @@ render_intro:
 		push	0x0a
 		call	putchar
 		add		esp, 4
-
 	inc		DWORD [ebp-4]
 	jmp		intro_y_loop_start
     intro_y_loop_end:
@@ -1586,27 +1504,15 @@ init_intro:
     push    ebp
     mov     ebp, esp
 
-    cmp     DWORD[ebp+8], 1
-    jne     init_intro_if1
-        lea     esi, [intro_file]
-        lea     edi, [introboard]
-        jmp     init_intro_endif
+    sub     esp, 12
+    mov     DWORD[ebp-12], 0 
+    lea     esi, [board_file]
+    lea     edi, [board]
 
-    init_intro_if1:
-    cmp     DWORD[ebp+8], 2
-    jne     init_intro_if2
-        lea     esi, [struc_file]
-        lea     edi, [strucboard]
-        jmp     init_intro_endif
+    top_intro_loop:
+    cmp     DWORD[ebp-12], 2
+    jg      end_intro_loop
 
-    init_intro_if2:
-        lea     esi, [board_file]
-        lea     edi, [board]
-        jmp     init_intro_endif
-
-    init_intro_endif:
-
-    sub     esp, 8
     push    mode_r
     push    esi
     call    fopen
@@ -1635,9 +1541,16 @@ init_intro:
     jmp     intro_read_loop
     intro_read_loop_end:
 
+    add     esi, 16
+    add     edi, 1080
+    inc     DWORD[ebp-12]
+
     push    DWORD[ebp-4]
     call    fclose
     add     esp, 4
+
+    jmp     top_intro_loop
+    end_intro_loop:
     
     mov     esp, ebp
     pop     ebp
@@ -1889,7 +1802,6 @@ bwcalc_check:
         check_loop_inner:
         cmp     DWORD[ebp-8], -2
         je      check_loop_bot
-                                
             push    DWORD[ebp-12]
             push    DWORD[ebp+8]
             push    DWORD[ebp-8]
@@ -1953,7 +1865,6 @@ bwcalc_check:
     jge     end_k_check
         mov     ecx, DWORD[knightarr+4*esi]
         mov     edx, DWORD[knightarr+4*(esi+1)]
-
         push    DWORD[ebp-12]
         push    ecx
         push    edx
