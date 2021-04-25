@@ -26,7 +26,7 @@ Features Include:
  * Check and Checkmate detection and movement 
 
 Glitches:
-* Castling will probably allow you to castle out of, or through check
+ * save text doesn't load while in check
 
 # Screenshots
 
