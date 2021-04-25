@@ -75,7 +75,7 @@ segment .data
     frmt_instructions   db  "u - undo, z - back, x - exit, s - save",10,13,0
     frmt_capture1       db  " Captured by white: ", 0
     frmt_capture2       db  " Captured by black: ", 0
-    frmt_promote        db  "Enter a promotion Bishop(B), Rook(R), Knight(K), or Queen (Q): ", 0
+    frmt_promote        db  "Enter a promotion Bishop(b), Rook(r), Knight(h), or Queen (q): ", 0
     frmt_intro          db  "Enter an option: ", 0
     frmt_cont           db  "---- Press any key to continue ----", 0
     memjumparr          db  3,0,0,0,0,0,2,0,0,5,0,0,0,0,0,4,1
@@ -426,20 +426,22 @@ main:
             call    fill_capture
             add     esp, 8
 
-            mov     dl, BYTE[currChar]
-
             ; Promote Pawn
-            cmp     dl, "P"
-            je      promote_pawn1
-            cmp     dl, "p"
-            je      promote_pawn2
+            cmp     BYTE[currChar], "P"
+            je      prom_pawn
+            cmp     BYTE[currChar], "p"
+            je      prom_pawn
+            jmp     end_prom_pawn
+            mov     eax, DWORD[xyposLast2]
+            mov     ebx, 56
+            cdq
+            div     ebx
+            cmp     edx, 8
+            jge     end_prom_pawn
 
-            jmp     game_bottom
+            prom_pawn:
+                call    render
 
-            promote_pawn1:
-            cmp     DWORD[xyposLast2], 56
-            jl      game_bottom
-                prom_top:
                 push    frmt_promote
                 call    printf
                 add     esp, 4
@@ -448,67 +450,25 @@ main:
                 push    frmt_reg
                 call    scanf
                 add     esp, 8
+                
+                mov     bl, BYTE[userin]
+                cmp     bl, "r"
+                je      do_prom
+                cmp     bl, "h"
+                je      do_prom
+                cmp     bl, "q"
+                je      do_prom
+                cmp     bl, "b"
+                je      do_prom
+                jmp     prom_pawn
 
-                cmp     BYTE[userin], "R"
-                jne     prom_next1
-                    mov     eax, DWORD[xyposLast2]
-                    mov     BYTE[pieces+eax], "R"
-                    jmp     game_bottom
-                prom_next1:
-                cmp     BYTE[userin], "K"
-                jne     prom_next2
-                    mov     eax, DWORD[xyposLast2]
-                    mov     BYTE[pieces+eax], "K"
-                    jmp     game_bottom
-                prom_next2:
-                cmp     BYTE[userin], "B"
-                jne     prom_next3
-                    mov     eax, DWORD[xyposLast2]
-                    mov     BYTE[pieces+eax], "B"
-                    jmp     game_bottom
-                prom_next3:
-                cmp     BYTE[userin], "Q"
-                jne     prom_top
-                    mov     eax, DWORD[xyposLast2]
-                    mov     BYTE[pieces+eax], "Q"
-                    jmp     game_bottom
-
-            promote_pawn2:
-            cmp     DWORD[xyposLast2], 8
-            jge     game_bottom
-                prom_top2:
-                push    frmt_promote
-                call    printf
-                add     esp, 4
-           
-                push    userin
-                push    frmt_reg
-                call    scanf
-                add     esp, 8
-
-                cmp     BYTE[userin], "R"
-                jne     prom_next21
-                    mov     eax, DWORD[xyposLast2]
-                    mov     BYTE[pieces+eax], "r"
-                    jmp     game_bottom
-                prom_next21:
-                cmp     BYTE[userin], "K"
-                jne     prom_next22
-                    mov     eax, DWORD[xyposLast2]
-                    mov     BYTE[pieces+eax], "k"
-                    jmp     game_bottom
-                prom_next22:
-                cmp     BYTE[userin], "B"
-                jne     prom_next23
-                    mov     eax, DWORD[xyposLast2]
-                    mov     BYTE[pieces+eax], "b"
-                    jmp     game_bottom
-                prom_next23:
-                cmp     BYTE[userin], "Q"
-                jne     prom_top2
-                    mov     eax, DWORD[xyposLast2]
-                    mov     BYTE[pieces+eax], "q"
-                    jmp     game_bottom
+                do_prom:
+                mov     eax, DWORD[xyposLast2]
+                mov     ecx, eax
+                and     ecx, 32
+                sub     bl, cl
+                mov     BYTE[pieces+eax], bl
+                end_prom_pawn:
 
         game_bottom:
         ; Calc Check Function
