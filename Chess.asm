@@ -428,10 +428,11 @@ main:
 
             ; Promote Pawn
             cmp     BYTE[currChar], "P"
-            je      prom_pawn
+            je      start_prom
             cmp     BYTE[currChar], "p"
-            je      prom_pawn
+            je      start_prom
             jmp     end_prom_pawn
+            start_prom:
             mov     eax, DWORD[xyposLast2]
             mov     ebx, 56
             cdq
