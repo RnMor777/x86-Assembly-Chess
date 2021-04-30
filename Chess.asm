@@ -1673,8 +1673,8 @@ processlinescheck:
         jmp     endprocesscheck
         
         n_check:
-        mov     ebx, DWORD[ebp-4]
-        add     ebx, DWORD[ebp-8]
+        mov     ebx, DWORD[ebp+8]
+        add     ebx, DWORD[ebp+12]
         xor     ecx, ecx
 
         mov     cl, "q"
@@ -1682,11 +1682,15 @@ processlinescheck:
         cmp     BYTE[pieces+eax], cl
         je      needcheck
 
+        cmp     ebx, 1
+        je      r_c
         mov     cl, "b"
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax],cl
         je      needcheck
+        jmp     endprocesscheck
 
+        r_c:
         mov     cl, "r"
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax], cl
