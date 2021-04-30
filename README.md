@@ -12,6 +12,12 @@ To compile/run the code do:
  * make
  * ./Chess
 
+To look best use the following:
+ * Font: Ubuntu Mono Regular, size of 13
+ * Colors: 
+
+![Colors](media/Colors.PNG)
+
 <hr>
 
 Features Include:
