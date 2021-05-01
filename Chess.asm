@@ -1658,7 +1658,6 @@ processlinescheck:
     je      endprocesscheck
     cmp     BYTE[pieces+eax], "-"
     je      botprocesscheck
-
         mov     ebx, "Z"
         add     ebx, DWORD[ebp+16]
         xor     ecx, ecx
@@ -1683,6 +1682,8 @@ processlinescheck:
         je      needcheck
 
         cmp     ebx, 1
+        je      r_c
+        cmp     ebx, -1
         je      r_c
         mov     cl, "b"
         sub     ecx, DWORD[ebp+16]
