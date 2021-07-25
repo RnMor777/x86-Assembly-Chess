@@ -2,6 +2,7 @@
 %define INTRO_FILE 'media/intro.txt'
 %define STRUC_FILE 'media/instructions.txt'
 %define SAVE_FILE  'saves/saves.txt'
+%define FEN_FILE   'saves/saves.fen'
 %define INIT_FILE  'media/.init'
 %define EXITCHAR   'x'
 %define BACKCHAR   'z'
@@ -21,6 +22,7 @@ segment .data
     struc_file          db  STRUC_FILE, 0
     save_file           db  SAVE_FILE, 0
     init_file           db  INIT_FILE, 0
+    fen_file            db  FEN_FILE, 0
     mode_r              db  "r", 0
     mode_w              db  "w", 0
     raw_mode_on_cmd     db  "stty raw -echo", 0
@@ -106,6 +108,7 @@ segment .bss
     prevCastle  resb    4
     wasCastle   resb    1
     inCheck     resb    2
+    fen         resb    90
 
 segment .text
 	global  main
@@ -217,6 +220,7 @@ main:
         jne      save_func2
             mov     DWORD[errorflag], 0x777
             call    save_current
+            call    save_fen
             jmp     game_bottom
         save_func2:
 
@@ -2096,4 +2100,92 @@ sieve_castle:
     mov     esp, ebp
     pop     ebp
     ret
+;void save_fen()
+save_fen: 
+    push    ebp
+    mov     ebp, esp
+    
+    ; position, count, iteration
+    sub     esp, 12
+    mov     DWORD[ebp-4], 0
+    mov     DWORD[ebp-8], 0
+    mov     DWORD[ebp-12], 0
+
+    top_fen:
+    mov     ecx, DWORD[ebp-12]
+    cmp     ecx, 64 
+    je      end_fen
+        test    ecx, 7
+        jnz     not_slash
+        cmp     ecx, 0
+        je      not_slash
+            cmp     DWORD[ebp-8], 0
+            je      not_numb
+                mov     eax, DWORD[ebp-4]
+                mov     ebx, DWORD[ebp-8]
+                add     bl, 48
+                mov     BYTE[fen+eax], bl
+                inc     DWORD[ebp-4]
+            not_numb:
+            mov     eax, DWORD[ebp-4]
+            mov     BYTE[fen+eax], '/'
+            inc     DWORD[ebp-4]
+            mov     DWORD[ebp-8], 0
+        not_slash: 
+        cmp     BYTE[pieces+ecx], '-'
+        jne     not_empty
+            inc     DWORD[ebp-8]
+            jmp     bot_fen
+        not_empty:
+        cmp     DWORD[ebp-8], 0
+        je      fen_ord
+            mov     eax, DWORD[ebp-4]
+            mov     ebx, DWORD[ebp-8]
+            add     bl, 48
+            mov     BYTE[fen+eax], bl
+            inc     DWORD[ebp-4]
+            mov     DWORD[ebp-8], 0
+        fen_ord:
+        mov     bl, BYTE[pieces+ecx]
+        cmp     bl, "h"
+        jne     fen_h1
+            mov bl, "n"
+        fen_h1:
+        cmp     bl, "H"
+        jne     fen_h2
+            mov     bl, "N" 
+        fen_h2:
+        cmp     bl, 96
+        jle     fen_swap
+            sub     bl, 32
+            jmp     fen_swap2
+        fen_swap:
+            add     bl, 32
+        fen_swap2:
+        mov     eax, DWORD[ebp-4]
+        mov     BYTE[fen+eax], bl
+        inc     DWORD[ebp-4]
+    bot_fen:
+    inc     DWORD[ebp-12]
+    jmp     top_fen
+    end_fen:
+
+    lea     esi, [fen_file]
+    push    mode_w
+    push    esi
+    call    fopen
+    add     esp, 8
+
+    lea     ebx, [fen]
+    push    eax
+    push    90
+    push    1
+    push    ebx
+    call    fwrite
+    add     esp, 16
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
 ; vim:ft=nasm
