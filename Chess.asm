@@ -2106,76 +2106,112 @@ save_fen:
     mov     ebp, esp
     
     ; position, count, iteration
-    sub     esp, 12
-    mov     DWORD[ebp-4], 0
-    mov     DWORD[ebp-8], 0
-    mov     DWORD[ebp-12], 0
+    xor     eax, eax
+    xor     ebx, ebx
+    xor     ecx, ecx
 
     top_fen:
-    mov     ecx, DWORD[ebp-12]
     cmp     ecx, 64 
     je      end_fen
         test    ecx, 7
         jnz     not_slash
         cmp     ecx, 0
         je      not_slash
-            cmp     DWORD[ebp-8], 0
+            cmp     ebx, 0
             je      not_numb
-                mov     eax, DWORD[ebp-4]
-                mov     ebx, DWORD[ebp-8]
-                add     bl, 48
                 mov     BYTE[fen+eax], bl
-                inc     DWORD[ebp-4]
+                add     BYTE[fen+eax], 48
+                inc     eax
             not_numb:
-            mov     eax, DWORD[ebp-4]
             mov     BYTE[fen+eax], '/'
-            inc     DWORD[ebp-4]
-            mov     DWORD[ebp-8], 0
+            inc     eax
+            xor     ebx, ebx
         not_slash: 
         cmp     BYTE[pieces+ecx], '-'
         jne     not_empty
-            inc     DWORD[ebp-8]
+            inc     ebx
             jmp     bot_fen
         not_empty:
-        cmp     DWORD[ebp-8], 0
+        cmp     ebx, 0
         je      fen_ord
-            mov     eax, DWORD[ebp-4]
-            mov     ebx, DWORD[ebp-8]
-            add     bl, 48
             mov     BYTE[fen+eax], bl
-            inc     DWORD[ebp-4]
-            mov     DWORD[ebp-8], 0
+            add     BYTE[fen+eax], 48
+            inc     eax
+            xor     ebx, ebx
         fen_ord:
-        mov     bl, BYTE[pieces+ecx]
-        cmp     bl, "h"
+        mov     dl, BYTE[pieces+ecx]
+        cmp     dl, "h"
         jne     fen_h1
-            mov bl, "n"
+            mov dl, "n"
         fen_h1:
-        cmp     bl, "H"
+        cmp     dl, "H"
         jne     fen_h2
-            mov     bl, "N" 
+            mov     dl, "N" 
         fen_h2:
-        cmp     bl, 96
+        cmp     dl, 96
         jle     fen_swap
-            sub     bl, 32
+            sub     dl, 32
             jmp     fen_swap2
         fen_swap:
-            add     bl, 32
+            add     dl, 32
         fen_swap2:
-        mov     eax, DWORD[ebp-4]
-        mov     BYTE[fen+eax], bl
-        inc     DWORD[ebp-4]
+        mov     BYTE[fen+eax], dl
+        inc     eax
     bot_fen:
-    inc     DWORD[ebp-12]
+    inc     ecx
     jmp     top_fen
     end_fen:
 
+    cmp     BYTE[playerTurn], 1
+    je      fen_black
+        mov     DWORD[fen+eax], ' w  '
+        jmp     fen_color
+    fen_black:
+        mov     bl, 'b'
+        mov     DWORD[fen+eax], ' b  '
+    fen_color:
+    add     eax, 3
+
+    xor     ebx, ebx
+    cmp     BYTE[canCastleW+1], 1
+    jne     fen_castle1
+        mov     BYTE[fen+eax], "K"
+        inc     eax
+        inc     ebx
+    fen_castle1:
+    cmp     BYTE[canCastleW], 1
+    jne     fen_castle2
+        mov     BYTE[fen+eax], "Q"
+        inc     eax
+        inc     ebx
+    fen_castle2:
+    cmp     BYTE[canCastleB+1], 1
+    jne     fen_castle3
+        mov     BYTE[fen+eax], "k"
+        inc     eax
+        inc     ebx
+    fen_castle3:
+    cmp     BYTE[canCastleB], 1
+    jne     fen_castle4
+        mov     BYTE[fen+eax], "q"
+        inc     eax
+        inc     ebx
+    fen_castle4:
+    cmp     ebx, 0
+    jne     fen_castle5
+        mov     BYTE[fen+eax], "-"
+        inc eax
+    fen_castle5:
+    mov     DWORD[fen+eax], " - 0"
+    mov     BYTE[fen+eax+4], ' '
+    mov     BYTE[fen+eax+5], '0' 
+
+    ; saves fen to file
     lea     esi, [fen_file]
     push    mode_w
     push    esi
     call    fopen
     add     esp, 8
-
     lea     ebx, [fen]
     push    eax
     push    90
