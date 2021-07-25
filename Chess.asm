@@ -2142,7 +2142,7 @@ save_fen:
         mov     dl, BYTE[pieces+ecx]
         cmp     dl, "h"
         jne     fen_h1
-            mov dl, "n"
+            mov     dl, "n"
         fen_h1:
         cmp     dl, "H"
         jne     fen_h2
@@ -2203,8 +2203,7 @@ save_fen:
         inc eax
     fen_castle5:
     mov     DWORD[fen+eax], " - 0"
-    mov     BYTE[fen+eax+4], ' '
-    mov     BYTE[fen+eax+5], '0' 
+    mov     WORD[fen+eax], ' 0'
 
     ; saves fen to file
     lea     esi, [fen_file]
