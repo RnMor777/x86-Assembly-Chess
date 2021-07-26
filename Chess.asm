@@ -10,11 +10,11 @@
 %define HEIGHT     15
 %define WIDTH      72 
 %define TOPVERT    4  
-%define TOPHORZ    25
+%define TOPHORZ    20
 %define ENDVERT    12
-%define ENDHORZ    41 
-%define ENDHORZ2   42
-%define TURNLOC    99
+%define ENDHORZ    36 
+%define ENDHORZ2   37
+%define TURNLOC    94
 
 segment .data
     board_file          db  BOARD_FILE, 0
@@ -108,7 +108,10 @@ segment .bss
     prevCastle  resb    4
     wasCastle   resb    1
     inCheck     resb    2
-    fen         resb    90
+    fen         resb    91
+    round       resb    1
+    stale       resb    1
+    pgn         resb    1 
 
 segment .text
 	global  main
@@ -2204,6 +2207,7 @@ save_fen:
     fen_castle5:
     mov     DWORD[fen+eax], " - 0"
     mov     WORD[fen+eax], ' 0'
+    mov     BYTE[fen+eax+6], 0
 
     ; saves fen to file
     lea     esi, [fen_file]
