@@ -66,6 +66,7 @@ segment .data
     frmt_spacesave      db  "%36s", 0
     frmt_spacecheck     db  "%42s", 0
     frmt_spacemate      db  "%46s", 0
+    frmt_moves          db  "%.8s", 0
     frmt_print          db  "Enter a move: ", 0
     frmt_print2         db  "Enter a destination: ", 0
     frmt_bcheck         db  "Black in Check", 10, 13, 0
@@ -108,10 +109,12 @@ segment .bss
     prevCastle  resb    4
     wasCastle   resb    1
     inCheck     resb    2
-    fen         resb    91
-    round       resb    1
+    fen         resb    90
+    round       resd    1
     stale       resb    1
-    pgn         resb    1 
+    pgn         resb    1600 
+    moves       resb    4
+    didMove     resb    1
 
 segment .text
 	global  main
@@ -198,6 +201,7 @@ main:
 
     ; actual game start
     game_loop:
+        mov     BYTE[didMove], 0
         call    render
         call    clearmoves
 
@@ -279,7 +283,20 @@ main:
             mov     BYTE[pieces+ecx], dl
             mov     DWORD[xyposLast1], -1
             xor     BYTE[playerTurn], 1
-    
+
+            mov     eax, DWORD[round]
+            dec     eax
+            shl     eax, 4
+            cmp     BYTE[playerTurn], 1
+            je      undoBlack
+                mov     DWORD[pgn+eax], 0
+                mov     DWORD[pgn+eax+4], 0
+                jmp     undocap
+            undoBlack:
+                mov     DWORD[pgn+eax-4], 0
+                mov     DWORD[pgn+eax-8], 0
+                dec     DWORD[round]
+            undocap:
             push    -1
             push    edx
             call    fill_capture
@@ -319,6 +336,9 @@ main:
         call    printf
         add     esp, 4
 
+        mov     ax, WORD[userin]
+        mov     WORD[moves], ax 
+
         push    userin
         push    frmt_reg
         call    scanf
@@ -332,6 +352,9 @@ main:
         call    convertpoint
         cmp     eax, 0x420
         je      game_next
+
+        mov     dx, WORD[userin]
+        mov     WORD[moves+2], dx
 
         mov     ecx, eax
         mov     bl, BYTE[markarr+eax]
@@ -352,6 +375,7 @@ main:
             mov     DWORD[xyposLast2], ecx
             mov     BYTE[prevChar], bl
             mov     BYTE[currChar], dl
+            mov     BYTE[didMove], 1
 
             ; Changes the player turn marker
             xor     BYTE[playerTurn], 1
@@ -478,6 +502,7 @@ main:
                 mov     BYTE[pieces+eax], bl
                 end_prom_pawn:
 
+
         game_bottom:
         ; Calc Check Function
         push    0
@@ -489,6 +514,10 @@ main:
         add     esp, 4
 
         call    clearmoves
+        cmp     BYTE[didMove], 0
+        je      nolog
+            call    log_moves 
+        nolog:
 
         cmp     BYTE[inCheck], 0
         je      skip_mate
@@ -563,6 +592,7 @@ seed_start:
     mov     DWORD[canCastleW], 0x01010101
     mov     BYTE[wasCastle], 0
     mov     DWORD[errorflag], 0 
+    mov     DWORD[round], 1
 
     call    clearmoves
 
@@ -714,7 +744,7 @@ render:
             mov     ebx, WIDTH
             mul     ebx
             add     eax, [ebp-8]
-            mov     ebx, 0
+            xor     ebx, ebx
             mov     bl, BYTE[board+eax]
             mov     DWORD[ebp-12], ebx
 
@@ -741,6 +771,47 @@ render:
             add     esp, 8
             jmp     piece_end
             endspecial:
+
+            ; prints the log of previous moves
+            cmp     bl, "w"
+            jne     endtrack
+                mov     bl, ' '
+                mov     eax, DWORD[ebp-4]
+                sub     eax, 3
+                mov     ecx, DWORD[round] 
+                cmp     ecx, 10
+                jle     noscroll
+                    add     eax, DWORD[round]
+                    sub     eax, 10
+                    dec     ecx
+                    shl     ecx, 4
+                    cmp     BYTE[pgn+ecx+1], 48
+                    jge     noscroll
+                        dec     eax
+                noscroll:
+                mov     ecx, eax
+                shl     ecx, 4
+                mov     DWORD[ebp-12], ecx
+                cmp     BYTE[pgn+ecx+1], 48
+                jl      endtrack
+                    lea     edx, [pgn+ecx]
+                    push    edx
+                    push    frmt_moves
+                    call    printf
+                    add     esp, 8
+                    add     DWORD[ebp-8], 7
+                mov     ecx, DWORD[ebp-12]
+                cmp     BYTE[pgn+ecx+9], '|'
+                jne     endtrack_in
+                    lea     edx, [pgn+ecx+8]
+                    push    edx
+                    push    frmt_moves
+                    call    printf
+                    add     esp, 8
+                    add     DWORD[ebp-8], 8
+            endtrack_in:
+                jmp     piece_end
+            endtrack:
             
             ; Default regular character
             push    ebx     
@@ -2226,5 +2297,152 @@ save_fen:
     mov     esp, ebp
     pop     ebp
     ret
+; void log_moves
+log_moves:
+    push    ebp
+    mov     ebp, esp
 
+    sub     esp, 4
+
+    mov     eax, DWORD[round]
+    mov     ebx, eax
+    dec     ebx
+    shl     ebx, 4
+
+    cmp     BYTE[playerTurn], 0
+    je      log_turn
+        cmp     eax, 9
+        jg      log_10
+            mov     BYTE[pgn+ebx], ' ' 
+            mov     BYTE[pgn+ebx+1], al
+            add     BYTE[pgn+ebx+1], 48
+            jmp     log_10_end
+        log_10:
+            cdq
+            mov     ecx, 10
+            div     ecx
+            mov     BYTE[pgn+ebx], al
+            mov     BYTE[pgn+ebx+1], dl
+            add     BYTE[pgn+ebx], 48
+            add     BYTE[pgn+ebx+1], 48
+        log_10_end:
+        mov     BYTE[pgn+ebx+2], ' '
+        add     ebx, 3
+        jmp     log_turn_end
+    log_turn:
+    add     ebx, 8
+    mov     BYTE[pgn+ebx], ' ' 
+    mov     BYTE[pgn+ebx+1], "|"
+    add     ebx, 2
+    inc     BYTE[round]
+
+    log_turn_end:
+    push    ebx 
+    call    move_to_text
+    add     esp, 4
+    mov     ecx, eax
+    cdq
+    mov     esi, 8
+    div     esi
+    
+    top_log:
+    cmp     edx, 8
+    je      end_log
+        mov     BYTE[pgn+ecx], ' '
+        inc     edx
+        inc     ecx
+    jmp     top_log
+    end_log:
+
+    ;lea     esi, [fen_file]
+    ;push    mode_w
+    ;push    esi
+    ;call    fopen
+    ;add     esp, 8
+
+    ;lea     ebx, [pgn]
+    ;mov     DWORD[ebp-4], eax
+    ;push    eax
+    ;push    300
+    ;push    1
+    ;push    ebx
+    ;call    fwrite
+    ;add     esp, 16
+        
+    ;push    DWORD[ebp-4]    
+    ;call    fclose
+    ;add     esp, 4
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; int move_to_text(int pgn_pos)
+move_to_text:
+    push    ebp
+    mov     ebp, esp
+
+    ; check castling
+
+    mov     eax, DWORD[ebp+8]
+    cmp     BYTE[currChar], 'p'
+    je      convPawn
+    cmp     BYTE[currChar], 'P'
+    je      convPawn
+        mov     bl, BYTE[currChar]
+        cmp     bl, "h"
+        jne     pgn_h1
+            mov     bl, "N"
+        pgn_h1:
+        cmp     bl, "H"
+        jne     pgn_h2
+            mov     bl, "N" 
+        pgn_h2:
+        cmp     bl, 96
+        jle     pgn_swap
+            sub     bl, 32
+        pgn_swap:
+        mov     BYTE[pgn+eax], bl
+        inc     eax
+    convPawn:
+
+    ; do interior stuff (capture, same file and spot, check)
+    cmp     BYTE[prevChar], '-'
+    je      convCapture
+        cmp     BYTE[currChar], 'p'
+        je      convCapP
+        cmp     BYTE[currChar], 'P'
+        je      convCapP
+            mov     BYTE[pgn+eax], 'x'
+            inc     eax
+            jmp     convCapture
+        convCapP:
+            mov     bl, BYTE[moves]
+            mov     BYTE[pgn+eax], bl
+            mov     BYTE[pgn+eax+1], 'x'
+            add     eax, 2
+    convCapture:     
+    ; do other interior stuff (move on same file)
+    
+    ; who is doing the moving
+    mov     bx, WORD[moves+2]
+    mov     BYTE[pgn+eax], bl
+    mov     BYTE[pgn+eax+1], bh 
+    add     eax, 2
+
+    ; do inCheck
+    cmp     BYTE[inCheck], 1
+    je      convCheck
+    cmp     BYTE[inCheck+1], 1
+    je      convCheck    
+        jmp     convCheckEnd
+    convCheck:
+        mov     BYTE[pgn+eax], '+'
+        inc     eax
+    convCheckEnd:
+
+    mov     esp, ebp
+    pop     ebp  
+    ret
+    
 ; vim:ft=nasm
