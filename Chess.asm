@@ -55,6 +55,7 @@ segment .data
     CORNLL              dw  __utf32__("└"), 0, 0
     CORNLR              dw  __utf32__("┘"), 0, 0
     UNICSPACE           dw  __utf32__(" "), 0, 0
+    CORNDOWN            dw  __utf32__("┬"), 0, 0
     copysymbol          dw  __utf32__("©"), 0, 0
     frmt_unic           db  "%ls", 0
     frmt_reg            db  "%s", 0
@@ -67,6 +68,7 @@ segment .data
     frmt_spacecheck     db  "%42s", 0
     frmt_spacemate      db  "%46s", 0
     frmt_moves          db  "%.8s", 0
+    frmt_moves2         db  "%.6s", 0
     frmt_print          db  "Enter a move: ", 0
     frmt_print2         db  "Enter a destination: ", 0
     frmt_bcheck         db  "Black in Check", 10, 13, 0
@@ -749,11 +751,19 @@ render:
             mov     DWORD[ebp-12], ebx
 
             ; This sets all the special unicode board characters
+            cmp     DWORD[ebp-4], 2
+            jl      endspecial  
             cmp     bl, "M"
             jl      endspecial
-            cmp     bl, "S"
+            cmp     bl, "V"
             jg      endspecial
-
+            cmp     bl, "T"
+            je      colorless
+            cmp     bl, "U"
+            jl      to_color     
+                sub     DWORD[ebp-12], 8 
+                jmp     colorless
+            to_color:
             push    color_edge
             call    printf
             add     esp, 4
@@ -762,6 +772,7 @@ render:
             call    printf
             add     esp, 4
 
+            colorless:
             mov     ebx, DWORD[ebp-12]
             sub     ebx, 77
             lea     eax, [VERT+ebx*8]
@@ -803,9 +814,19 @@ render:
                 mov     ecx, DWORD[ebp-12]
                 cmp     BYTE[pgn+ecx+9], '|'
                 jne     endtrack_in
-                    lea     edx, [pgn+ecx+8]
+                    push    frmt_space
+                    call    printf
+                    add     esp, 4
+
+                    push    VERT
+                    push    frmt_unic
+                    call    printf
+                    add     esp, 8
+
+                    mov     ecx, DWORD[ebp-12]
+                    lea     edx, [pgn+ecx+10]
                     push    edx
-                    push    frmt_moves
+                    push    frmt_moves2
                     call    printf
                     add     esp, 8
                     add     DWORD[ebp-8], 8
