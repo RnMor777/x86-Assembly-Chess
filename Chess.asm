@@ -113,7 +113,7 @@ segment .bss
     inCheck     resb    2
     fen         resb    90
     round       resd    1
-    stale       resb    1
+    inGame      resb    1
     pgn         resb    1600 
     moves       resb    4
     didMove     resb    1
@@ -198,11 +198,14 @@ main:
     push    raw_mode_off_cmd
     call    system
     add     esp, 4
-
+    
+    cmp     BYTE[inGame], 1
+    je      game_loop
     jmp     start_intro
 
     ; actual game start
     game_loop:
+        mov     BYTE[inGame], 1
         mov     BYTE[didMove], 0
         call    render
         call    clearmoves
@@ -224,6 +227,9 @@ main:
         ; Just clears the board
         cmp     al, BACKCHAR
         je      game_bottom
+
+        cmp     al, '?'
+        je      struc_loop
 
         cmp     al, 's'
         jne      save_func2
@@ -595,6 +601,7 @@ seed_start:
     mov     BYTE[wasCastle], 0
     mov     DWORD[errorflag], 0 
     mov     DWORD[round], 1
+    mov     BYTE[inGame], 0
 
     call    clearmoves
 
@@ -612,15 +619,15 @@ render:
     call    system
     add     esp, 4
 
-    mov     DWORD[ebp-4], 0
-    push    newline
-    call    printf
-    add     esp, 4
+    ;mov     DWORD[ebp-4], 0
+    ;push    newline
+    ;call    printf
+    ;add     esp, 4
 
-    push    frmt_instructions
-    push    frmt_space18
-    call    printf
-    add     esp, 8
+    ;push    frmt_instructions
+    ;push    frmt_space18
+    ;call    printf
+    ;add     esp, 8
 
     ; prints the turn marker
     xor     eax, eax
@@ -1518,8 +1525,8 @@ render_intro:
             lea     esi, [esi]
             mov		bl, BYTE [esi + eax] ;introboard + eax]
 
-            cmp     bl, '?'
-            je      intro_x_loop_end
+            ;cmp     bl, '?'
+            ;je      intro_x_loop_end
 
             cmp     bl, '%'
             jne     intro_x_endif
