@@ -1,15 +1,15 @@
                                                                  _:_    
      ()               Black's Turn              moves           '-.-'   
-  .-:--:-.                                  =============      __.'.__  
-   \____/         SONNNNNNNNNNNNNNNNPS   w        |           |_______| 
-   {====}       8 SM                MS   w        |            \=====/  
-    )__(        7 SM                MS   w        |             )___(   
-   /____\       6 SM                MS   w        |            /_____\  
-    |  |        5 SM                MS   w        |             |   |   
-    |  |        4 SM                MS   w        |             |   |   
-    |  |        3 SM                MS   w        |             |   |   
-    |  |        2 SM                MS   w        |             |   |   
-   /____\       1 SM                MS   w        |            /_____\  
-  (======)        SQNNNNNNNNNNNNNNNNRS   w        |           (=======) 
+  .-:--:-.                                  VVVVVVTVVVVVV      __.'.__  
+   \____/         SONNNNNNNNNNNNNNNNPS   w        U           |_______| 
+   {====}       8 SM                MS   w        U            \=====/  
+    )__(        7 SM                MS   w        U             )___(   
+   /____\       6 SM                MS   w        U            /_____\  
+    |  |        5 SM                MS   w        U             |   |   
+    |  |        4 SM                MS   w        U             |   |   
+    |  |        3 SM                MS   w        U             |   |   
+    |  |        2 SM                MS   w        U             |   |   
+   /____\       1 SM                MS   w        U            /_____\  
+  (======)        SQNNNNNNNNNNNNNNNNRS   w        U           (=======) 
   }======{          a b c d e f g h                           }======={ 
  (________)                                                  (_________)
