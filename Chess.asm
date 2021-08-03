@@ -1525,9 +1525,6 @@ render_intro:
             lea     esi, [esi]
             mov		bl, BYTE [esi + eax] ;introboard + eax]
 
-            ;cmp     bl, '?'
-            ;je      intro_x_loop_end
-
             cmp     bl, '%'
             jne     intro_x_endif
                 push    copysymbol
@@ -2202,7 +2199,7 @@ sieve_castle:
     mov     esp, ebp
     pop     ebp
     ret
-;void save_fen()
+; void save_fen()
 save_fen: 
     push    ebp
     mov     ebp, esp
@@ -2382,25 +2379,6 @@ log_moves:
     jmp     top_log
     end_log:
 
-    ;lea     esi, [fen_file]
-    ;push    mode_w
-    ;push    esi
-    ;call    fopen
-    ;add     esp, 8
-
-    ;lea     ebx, [pgn]
-    ;mov     DWORD[ebp-4], eax
-    ;push    eax
-    ;push    300
-    ;push    1
-    ;push    ebx
-    ;call    fwrite
-    ;add     esp, 16
-        
-    ;push    DWORD[ebp-4]    
-    ;call    fclose
-    ;add     esp, 4
-
     mov     esp, ebp
     pop     ebp
     ret
@@ -2410,9 +2388,24 @@ move_to_text:
     push    ebp
     mov     ebp, esp
 
-    ; check castling
-
     mov     eax, DWORD[ebp+8]
+
+    ; Logs castling Move
+    cmp     BYTE[wasCastle], 0
+    je      log_no_castle
+        mov     BYTE[pgn+eax], 'O'
+        mov     BYTE[pgn+eax+1], '-'
+        mov     BYTE[pgn+eax+2], 'O'
+        add     eax, 3
+        test    BYTE[wasCastle], 1
+        je      convCheckStart
+            mov     BYTE[pgn+eax], '-'
+            mov     BYTE[pgn+eax+1], 'O'
+            add     eax, 2
+            jmp     convCheckStart
+    log_no_castle:
+
+    ; Logs the piece moving
     cmp     BYTE[currChar], 'p'
     je      convPawn
     cmp     BYTE[currChar], 'P'
@@ -2434,7 +2427,7 @@ move_to_text:
         inc     eax
     convPawn:
 
-    ; do interior stuff (capture, same file and spot, check)
+    ; Logs a capture (same file and spot)
     cmp     BYTE[prevChar], '-'
     je      convCapture
         cmp     BYTE[currChar], 'p'
@@ -2450,15 +2443,15 @@ move_to_text:
             mov     BYTE[pgn+eax+1], 'x'
             add     eax, 2
     convCapture:     
-    ; do other interior stuff (move on same file)
     
-    ; who is doing the moving
+    ; Logs space moving
     mov     bx, WORD[moves+2]
     mov     BYTE[pgn+eax], bl
     mov     BYTE[pgn+eax+1], bh 
     add     eax, 2
 
-    ; do inCheck
+    ; Logs if move results in check
+    convCheckStart:
     cmp     BYTE[inCheck], 1
     je      convCheck
     cmp     BYTE[inCheck+1], 1
