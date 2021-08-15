@@ -69,7 +69,7 @@ segment .data
     frmt_print2         db  "Enter a destination: ", 0
     frmt_bcheck         db  "Black in Check", 10, 13, 0
     frmt_wcheck         db  "White in Check", 10, 13, 0
-    frmt_turn           db  "White",0,0,0,"Black"
+    frmt_turn           db  "WhiteBlack"
     frmt_saved          db  "Saved",0
     frmt_mate           db  "Checkmate - Game Over!", 10, 13, 0
     frmt_again          db  "Play again? (y/n): ", 0
@@ -613,18 +613,13 @@ render:
 
     ; prints the turn marker
     xor     eax, eax
+    mov     ebx, 5
     mov     al, BYTE[playerTurn]
-    lea     ebx, [frmt_turn+eax*8]
-    mov     ecx, 0
-    top_turn_mark:
-    cmp     ecx, 5
-    je      end_turn_mark
-        mov     al, BYTE[ebx]
-        mov     BYTE[board+TURNLOC+ecx], al 
-    inc     ebx
-    inc     ecx
-    jmp     top_turn_mark
-    end_turn_mark:
+    mul     ebx
+    mov     ebx, DWORD[frmt_turn+eax]
+    mov     DWORD[board+94], ebx
+    mov     bl, BYTE[frmt_turn+eax+4]
+    mov     BYTE[board+98], bl 
 
     mov     DWORD[ebp-4], 0
     y_loop_start:
@@ -2620,6 +2615,7 @@ move_to_text:
 check_special:
     push    ebp
     mov     ebp, esp
+
 
     xor     ebx, ebx
     mov     bl, BYTE[currChar]
