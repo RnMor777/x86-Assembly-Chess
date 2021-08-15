@@ -30,6 +30,11 @@ Features Include:
  * Turn system
  * Ability to save and load a game
  * Check and Checkmate detection and movement 
+New Features:
+ * En passant capturing
+ * Access instructions by pressing ?
+ * Logging of moves in PGN format
+ * Saving now also saves a file in FEN format
 
 Glitches:
  * save text doesn't load while in check
