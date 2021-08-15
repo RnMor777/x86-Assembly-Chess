@@ -11,5 +11,5 @@
     |  |         u - undo the last move                         |   |   
    /____\        ? - displays this screen                      /_____\  
   (======)                                                    (=======) 
-  }======{     Enter move e.g. (e2) the hit enter. Then       }======={ 
+  }======{     Enter move e.g. (e2) then hit enter. Then      }======={ 
  (________)    for the destination do the same e.g. (e4)     (_________)
