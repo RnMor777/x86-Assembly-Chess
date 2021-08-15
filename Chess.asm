@@ -223,9 +223,11 @@ main:
         cmp     al, 'x'
         je      again_loop_end
 
+        ; Loads Instruction page
         cmp     al, '?'
         je      struc_loop
 
+        ; Saves the game
         cmp     al, 's'
         jne      save_func2
             mov     DWORD[errorflag], 0x777
@@ -239,101 +241,12 @@ main:
         jne     end_undo
         cmp     DWORD[xyposLast1], -1
         je      end_undo
-        cmp     BYTE[wasCastle], 1
-        je      undocastle1
-        cmp     BYTE[wasCastle], 2
-        je      undocastle2
-        cmp     BYTE[wasCastle], 3
-        je      undocastle3
-        cmp     BYTE[wasCastle], 4
-        je      undocastle4
-        jmp     botundocastle
-            undocastle1:
-            mov     BYTE[pieces], "R"
-            mov     BYTE[pieces+4], "K"
-            mov     BYTE[pieces+2], "-"
-            mov     BYTE[pieces+3], "-"
-            jmp     botundocastle
-            undocastle2:
-            mov     BYTE[pieces+7], "R"
-            mov     BYTE[pieces+4], "K"
-            mov     BYTE[pieces+5], "-"
-            mov     BYTE[pieces+6], "-"
-            jmp     botundocastle
-            undocastle3:
-            mov     BYTE[pieces+56], "r"
-            mov     BYTE[pieces+60], "k"
-            mov     BYTE[pieces+58], "-"
-            mov     BYTE[pieces+59], "-"
-            jmp     botundocastle
-            undocastle4:
-            mov     BYTE[pieces+63], "r"
-            mov     BYTE[pieces+60], "k"
-            mov     BYTE[pieces+61], "-"
-            mov     BYTE[pieces+62], "-"
-
-            botundocastle:
-            mov     ebx, DWORD[prevCastle]
-            mov     DWORD[canCastleW], ebx
-            endundocastle:
-
-            mov     edx, 0
-            mov     ebx, DWORD[xyposLast1]
-            mov     ecx, DWORD[xyposLast2]
-            mov     dl, BYTE[currChar]
-            mov     BYTE[pieces+ebx], dl
-            mov     dl, BYTE[prevChar]
-            mov     BYTE[pieces+ecx], dl
-            mov     DWORD[xyposLast1], -1
-            xor     BYTE[playerTurn], 1
-
-            mov     eax, DWORD[round]
-            dec     eax
-            shl     eax, 4
-            cmp     BYTE[playerTurn], 1
-            je      undoBlack
-                mov     DWORD[pgn+eax], 0
-                mov     DWORD[pgn+eax+4], 0
-                jmp     undocap
-            undoBlack:
-                mov     DWORD[pgn+eax-7], 0
-                mov     WORD[pgn+eax-3], 0
-                mov     BYTE[pgn+eax-1], 0
-                dec     DWORD[round]
-            undocap:
-
-            cmp     BYTE[wasPas], 1
-            jne     endUndoPas
-                mov     eax, "5"
-                mov     ebx, "4"
-                cmp     BYTE[prevEnPas+1], "3"  
-                cmove   eax, ebx
-                sub     eax, 48 
-                mov     ebx, 8
-                sub     ebx, eax
-                shl     ebx, 3
-                mov     al, BYTE[prevEnPas]
-                sub     eax, 97
-                add     ebx, eax
-                mov     eax, "P"
-                mov     ecx, "p"
-                cmp     BYTE[playerTurn], 1
-                cmove   eax, ecx
-                mov     BYTE[pieces+ebx], al
-                mov     BYTE[wasPas], 0
-                mov     bx, WORD[prevEnPas]
-                mov     WORD[enPasTar], bx
-            endUndoPas:
-
-            push    -1
-            push    edx
-            call    fill_capture
-            add     esp, 8 
-    
+            call    undo_func 
             jmp     game_bottom
         end_undo:
 
         ; Converts the entered points into integer values in the array
+        ; STEP 1: Get the initial move square
         call    convertpoint
         cmp     eax, 0x420
         je      game_bottom
@@ -367,6 +280,7 @@ main:
         mov     ax, WORD[userin]
         mov     WORD[moves], ax 
 
+        ; STEP 2: Get the destination square
         push    userin
         push    frmt_reg
         call    scanf
@@ -504,7 +418,13 @@ main:
                 mov     al, BYTE[enPasTar]
                 sub     eax, 97
                 add     ebx, eax
+                xor     eax, eax
+                mov     al, BYTE[pieces+ebx]
                 mov     BYTE[pieces+ebx], '-'
+                push    1
+                push    eax 
+                call    fill_capture
+                add     esp, 8
             passant_move:
             mov     bx, WORD[enPasTar]
             mov     WORD[prevEnPas], bx
@@ -579,7 +499,6 @@ main:
                     mov     BYTE[enPasTar+1], dl
             no_enpas:
 
-
         game_bottom:
         ; Calc Check Function
         push    0
@@ -616,7 +535,6 @@ main:
         je      game_loop_end
         jmp     game_loop
     game_loop_end:
-
     again_loop:
         call    render
         push    frmt_again
@@ -983,6 +901,106 @@ render:
     pop     ebp
     ret
 
+; void undo_func()
+undo_func:
+    push    ebp
+    mov     ebp, esp
+
+    cmp     BYTE[wasCastle], 1
+    je      undocastle1
+    cmp     BYTE[wasCastle], 2
+    je      undocastle2
+    cmp     BYTE[wasCastle], 3
+    je      undocastle3
+    cmp     BYTE[wasCastle], 4
+    je      undocastle4
+    jmp     botundocastle
+        undocastle1:
+        mov     BYTE[pieces], "R"
+        mov     BYTE[pieces+4], "K"
+        mov     BYTE[pieces+2], "-"
+        mov     BYTE[pieces+3], "-"
+        jmp     botundocastle
+        undocastle2:
+        mov     BYTE[pieces+7], "R"
+        mov     BYTE[pieces+4], "K"
+        mov     BYTE[pieces+5], "-"
+        mov     BYTE[pieces+6], "-"
+        jmp     botundocastle
+        undocastle3:
+        mov     BYTE[pieces+56], "r"
+        mov     BYTE[pieces+60], "k"
+        mov     BYTE[pieces+58], "-"
+        mov     BYTE[pieces+59], "-"
+        jmp     botundocastle
+        undocastle4:
+        mov     BYTE[pieces+63], "r"
+        mov     BYTE[pieces+60], "k"
+        mov     BYTE[pieces+61], "-"
+        mov     BYTE[pieces+62], "-"
+
+        botundocastle:
+        mov     ebx, DWORD[prevCastle]
+        mov     DWORD[canCastleW], ebx
+        endundocastle:
+
+        mov     edx, 0
+        mov     ebx, DWORD[xyposLast1]
+        mov     ecx, DWORD[xyposLast2]
+        mov     dl, BYTE[currChar]
+        mov     BYTE[pieces+ebx], dl
+        mov     dl, BYTE[prevChar]
+        mov     BYTE[pieces+ecx], dl
+        mov     DWORD[xyposLast1], -1
+        xor     BYTE[playerTurn], 1
+
+        mov     eax, DWORD[round]
+        dec     eax
+        shl     eax, 4
+        cmp     BYTE[playerTurn], 1
+        je      undoBlack
+            mov     DWORD[pgn+eax], 0
+            mov     DWORD[pgn+eax+4], 0
+            jmp     undocap
+        undoBlack:
+            mov     DWORD[pgn+eax-7], 0
+            mov     WORD[pgn+eax-3], 0
+            mov     BYTE[pgn+eax-1], 0
+            dec     DWORD[round]
+        undocap:
+
+        cmp     BYTE[wasPas], 1
+        jne     endUndoPas
+            mov     eax, "5"
+            mov     ebx, "4"
+            cmp     BYTE[prevEnPas+1], "3"  
+            cmove   eax, ebx
+            sub     eax, 48 
+            mov     ebx, 8
+            sub     ebx, eax
+            shl     ebx, 3
+            mov     al, BYTE[prevEnPas]
+            sub     eax, 97
+            add     ebx, eax
+            mov     eax, "P"
+            mov     ecx, "p"
+            cmp     BYTE[playerTurn], 1
+            cmove   eax, ecx
+            mov     BYTE[pieces+ebx], al
+            mov     edx, eax
+            mov     BYTE[wasPas], 0
+            mov     bx, WORD[prevEnPas]
+            mov     WORD[enPasTar], bx
+        endUndoPas:
+
+        push    -1
+        push    edx
+        call    fill_capture
+        add     esp, 8 
+
+    mov     esp, ebp
+    pop     ebp
+    ret
 ; int calc_square (pos x, pos y, offset x, offset y)
 calc_square:
     push    ebp
