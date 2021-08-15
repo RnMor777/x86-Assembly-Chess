@@ -30,6 +30,7 @@ Features Include:
  * Turn system
  * Ability to save and load a game
  * Check and Checkmate detection and movement 
+ 
 New Features:
  * En passant capturing
  * Access instructions by pressing ?
