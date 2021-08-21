@@ -596,6 +596,7 @@ seed_start:
     mov     WORD[enPasTar], 0
 
     call    clearmoves
+    call    clearpgn
 
     mov     esp, ebp
     pop     ebp
@@ -1048,6 +1049,23 @@ clearmoves:
         inc     ecx
         jmp     startclear
     endclear:
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; void clearpgn()
+clearpgn:
+    push    ebp
+    mov     ebp, esp
+
+    mov     ecx, 0
+    startclearpgn:
+    cmp     ecx, 1600
+    jge     endclearpgn
+        mov     BYTE[pgn+ecx], ""
+        inc     ecx
+        jmp     startclearpgn
+    endclearpgn:
     mov     esp, ebp
     pop     ebp
     ret
