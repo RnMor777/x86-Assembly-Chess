@@ -130,6 +130,8 @@ segment .text
     extern  fgetc
     extern  fclose
     extern  setlocale
+    extern  malloc
+    extern  free
 
 ; main()
 main:
@@ -2705,4 +2707,89 @@ check_special:
     mov     esp, ebp
     pop     ebp
     ret
+makestack: ; struct stackPointer *makestack()
+    push    ebp
+    mov     ebp, esp
+    
+    push    12
+    call    malloc
+    add     esp, 4
+    mov     DWORD[eax], 0
+    mov     DWORD[eax+4], 0
+    mov     DWORD[eax+8], 0
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+makenode: ; struct snode *makenode()
+    push    ebp
+    mov     ebp, esp
+
+    push    24
+    call    malloc
+    add     esp, 4
+
+    mov     DWORD[eax], 0
+    mov     DWORD[eax+4], 0
+    
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+pushBack: ; void pushBack (struct Stack *S)
+    push    ebp
+    mov     ebp, esp
+
+    call    makenode
+    mov     ecx, eax
+    
+    mov     eax, DWORD[ebp+8]
+    mov     ebx, DWORD[eax]
+    cmp     ebx, 0
+    jne     insBackElse
+        mov     DWORD[eax], ecx
+        mov     DWORD[eax+4], ecx
+        jmp     insBackEnd
+    insBackElse: 
+        mov     ebx, DWORD[ebp+8]
+        mov     ebx, DWORD[ebx+4]
+        mov     DWORD[ebx], ecx
+        mov     eax, DWORD[eax+4]
+        mov     DWORD[ecx+4], eax
+
+        mov     ebx, DWORD[ebp+8]
+        mov     DWORD[ebx+4], ecx
+    insBackEnd:
+    mov     eax, DWORD[ebp+8]
+    inc     DWORD[eax+8]
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+popBack: ; void popBack (struct Stack *S)
+    push    ebp
+    mov     ebp, esp
+
+    mov     eax, DWORD[ebp+8]
+    cmp     DWORD[eax+8], 0
+    je      endPopBack
+
+    mov     ebx, DWORD[eax+4]
+    mov     ecx, DWORD[ebx+4]
+    mov     DWORD[ecx], 0
+    mov     DWORD[eax+4], ecx
+
+    push    ebx
+    call    free
+    add     esp, 4
+
+    mov     eax, DWORD[ebp+8]
+    sub     DWORD[eax+8], 1
+    endPopBack:
+    mov     esp, ebp
+    pop     ebp
+    ret
+
 ; vim:ft=nasm
