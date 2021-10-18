@@ -328,7 +328,6 @@ main:
             mov     esi, DWORD[canCastleW]
             mov     DWORD[prevCastle], esi
 
-
             ; Changes castling information on piece movement
             cmp     dl, "k"
             jne     next_castle
@@ -403,6 +402,16 @@ main:
             add     esp, 8
 
             ; Does the enpassant capture
+            mov     eax, 1
+            xor     ebx, ebx
+            mov     cl, BYTE[currChar]
+            cmp     cl, "P"
+            cmove   eax, ebx
+            cmp     cl, "p"
+            cmove   eax, ebx
+            cmp     eax, 0
+            jne     passant_move 
+             
             mov     bx, WORD[moves+2]
             cmp     bx, WORD[enPasTar]
             jne     passant_move
@@ -965,6 +974,7 @@ undo_func:
             dec     DWORD[round]
         undocap:
 
+        mov     WORD[enPasTar], 0
         cmp     BYTE[wasPas], 1
         jne     endUndoPas
             mov     eax, "5"
@@ -1230,6 +1240,8 @@ processpawn:
 
     sub     esp, 8
 
+    ; is used to determine which way the pawn direction is going
+    ; based on the opponent letter A or a
     mov     eax, 1
     mov     ebx, -1
     cmp     BYTE[ebp+8], "A"
@@ -1241,10 +1253,12 @@ processpawn:
     cmovne  ebx, ecx
     mov     DWORD[ebp-8], ebx
 
+    ; outer lop checks -1, 0, 1 offset of x positions
     mov     ecx, -1
     neo_top:
     cmp     ecx, 2
     je      neo_end
+        ; checks if move square is a valid position
         push    DWORD[ebp-4]
         push    ecx
         push    DWORD[ypos]
@@ -1252,58 +1266,68 @@ processpawn:
         call    calc_square
         add     esp, 16
         cmp     eax, 0x420
-        je      neo_bot
-            cmp     ecx, 0
-            jne     dia_moves
-                cmp     BYTE[pieces+eax], '-'
-                jne     neo_bot
-                mov     BYTE[markarr+eax], '+'   
-                mov     ebx, DWORD[ebp-8]
-                add     ebx, 49
-                cmp     BYTE[userin+1], bl
-                jne     neo_bot
+        je      pawn_bot
 
-                mov     ebx, DWORD[ebp-4]
-                shl     ebx, 1
-                push    ebx
-                push    0
-                push    DWORD[ypos]
-                push    DWORD[xpos]
-                call    calc_square
-                add     esp, 16
-                cmp     eax, 0x420
-                je      neo_bot
-                cmp     BYTE[pieces+eax], '-'
-                jne     neo_bot
-                mov     BYTE[markarr+eax], '+'   
-                jmp     neo_bot
-            dia_moves:
-                cmp     BYTE[markarr+eax], '-'
-                je      neo_bot
-                cmp     WORD[enPasTar], 0
-                je      dia_pas
-                    mov     ebx, '8'
-                    sub     bl, BYTE[enPasTar+1]
-                    shl     ebx, 3
-                    mov     dl, BYTE[enPasTar]
-                    sub     dl, 'a'
-                    add     bl, dl
-                    cmp     eax, ebx
-                    jne     dia_pas
-                        mov     BYTE[markarr+eax], "+"
-                        jmp     neo_bot
+        ; checks the square right above (x offset of 0)
+        cmp     ecx, 0
+        jne     diag_moves
+        cmp     BYTE[pieces+eax], '-'
+        jne     pawn_bot
+            ; checks if moving from starting position
+            mov     BYTE[markarr+eax], '+'   
+            mov     ebx, DWORD[ebp-8]
+            add     ebx, 49
+            cmp     BYTE[userin+1], bl
+            jne     pawn_bot
 
-                dia_pas:
-                mov     ebx, DWORD[ebp+8]
-                xor     edx, edx
-                mov     dl, BYTE[pieces+eax]
-                sub     edx, ebx
-                cmp     edx, 0
-                jl      neo_bot
-                cmp     edx, 26
-                jge     neo_bot
-                mov     BYTE[markarr+eax], '+'
-    neo_bot:
+            ; checks if moving 2 spaces is a valid move
+            mov     ebx, DWORD[ebp-4]
+            shl     ebx, 1
+            push    ebx
+            push    0
+            push    DWORD[ypos]
+            push    DWORD[xpos]
+            call    calc_square
+            add     esp, 16
+            cmp     eax, 0x420
+            je      pawn_bot
+            cmp     BYTE[pieces+eax], '-'
+            jne     pawn_bot
+            mov     BYTE[markarr+eax], '+'   
+            jmp     pawn_bot
+
+        ; checks diagonal move squares
+        diag_moves:
+        cmp     WORD[enPasTar], 0
+        jne     diag_pas
+        cmp     BYTE[markarr+eax], '-'
+        je      pawn_bot
+            ; checks for capturing opponent on diagonal
+            mov     ebx, DWORD[ebp+8]
+            xor     edx, edx
+            mov     dl, BYTE[pieces+eax]
+            sub     edx, ebx
+            cmp     edx, 0
+            jl      pawn_bot
+            cmp     edx, 26
+            jge     pawn_bot
+
+            mov     BYTE[markarr+eax], '+'
+            jmp     pawn_bot
+
+            ; checks for capturing enpassant on diagonal
+            diag_pas:
+            mov     ebx, '8'
+            sub     bl, BYTE[enPasTar+1]
+            shl     ebx, 3
+            mov     dl, BYTE[enPasTar]
+            sub     dl, 'a'
+            add     bl, dl
+            cmp     eax, ebx
+            jne     pawn_bot
+
+            mov     BYTE[markarr+eax], "+"
+    pawn_bot:
     inc     ecx
     jmp     neo_top
     neo_end:
@@ -2633,7 +2657,6 @@ move_to_text:
 check_special:
     push    ebp
     mov     ebp, esp
-
 
     xor     ebx, ebx
     mov     bl, BYTE[currChar]
