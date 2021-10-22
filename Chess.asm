@@ -410,6 +410,7 @@ seed_start:
     mov     BYTE[inGame], 0
     mov     WORD[wasProm], 0
     mov     WORD[enPasTar], 0
+    mov     BYTE[castleInf], 15
 
     call    clearmoves
     call    clearpgn
@@ -1110,10 +1111,14 @@ processking:
     shr     eax, 5
     mov     ebx, eax
     xor     ebx, 1
+    mov     ecx, ebx
     imul    ebx, 7
+    mov     edx, 8
+    lea     ecx, [ecx*2]
+    shr     edx, cl
 
-    cmp     BYTE[canCastleW+(eax*2)], 1
-    jne     kingside
+    test    BYTE[castleInf], dl
+    jz      kingside
         cmp     BYTE[pieces+(ebx*8)+1], "-"
         jne     kingside
         cmp     BYTE[pieces+(ebx*8)+2], "-"
@@ -1122,8 +1127,9 @@ processking:
         jne     kingside
             mov     BYTE[markarr+(ebx*8)+2], "+" 
     kingside:
-        cmp     BYTE[canCastleW+(eax*2)+1], 1
-        jne     endCastle
+        shr     edx, 1
+        test    BYTE[castleInf], dl
+        jz      endCastle
             cmp     BYTE[pieces+(ebx*8)+5], "-"
             jne     endCastle
             cmp     BYTE[pieces+(ebx*8)+6], "-"
@@ -2522,54 +2528,45 @@ pushBack: ; void pushBack (struct Stack *S, int currPos, int newPos)
         jmp     endMoveCastle
         castleKing:
         mov     al, BYTE[pieces+ebx+1]
-        mov     BYTE[pieces+edx+1], "-"
-        mov     BYTE[pieces+edx-1], al
+        mov     BYTE[pieces+ebx+1], "-"
+        mov     BYTE[pieces+ebx-1], al
         mov     BYTE[esi+10], 2
         mov     BYTE[esi+9], al
     endMoveCastle:
 
     ; updates castling information
-    cmp     ch, "K" 
-    lahf 
-    shr     eax, 14
-    xor     eax, 1
-    lea     eax, [eax*3]
-    and     BYTE[castleInf], al
-    cmp     ch, "k" 
-    lahf 
-    shr     eax, 14
-    xor     eax, 1
-    mov     dl, 12
-    mul     dl
-    and     BYTE[castleInf], al
-    cmp     BYTE[pieces], "R"
-    lahf
-    shr     eax, 14
-    xor     eax, 1
-    mov     dl, 7
-    mul     dl
-    and     BYTE[castleInf], al
-    cmp     BYTE[pieces+7], "R"
-    lahf
-    shr     eax, 14
-    xor     eax, 1
-    mov     dl, 11
-    mul     dl
-    and     BYTE[castleInf], al
-    cmp     BYTE[pieces+56], "r"
-    lahf
-    shr     eax, 14
-    xor     eax, 1
-    mov     dl, 13
-    mul     dl
-    and     BYTE[castleInf], al
-    cmp     BYTE[pieces+63], "r"
-    lahf
-    shr     eax, 14
-    xor     eax, 1
-    mov     dl, 14
-    mul     dl
-    and     BYTE[castleInf], al
+    xor     eax, eax
+    mov     al, BYTE[castleInf]
+    mov     edx, 3
+    cmp     ch, "K"
+    cmove   eax, edx
+    and     al, BYTE[castleInf]
+
+    mov     edx, 12
+    cmp     ch, "k"
+    cmove   eax, edx
+    and     al, BYTE[castleInf]
+
+    mov     edx, 7
+    cmp     BYTE[pieces], "R" 
+    cmovne  eax, edx
+    and     al, BYTE[castleInf]
+
+    mov     edx, 11
+    cmp     BYTE[pieces+7], "R" 
+    cmovne  eax, edx
+    and     al, BYTE[castleInf]
+    
+    mov     edx, 13
+    cmp     BYTE[pieces+56], "r" 
+    cmovne  eax, edx
+    and     al, BYTE[castleInf]
+
+    mov     edx, 14
+    cmp     BYTE[pieces+63], "r" 
+    cmovne  eax, edx
+    and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
 
     ; Executes the EnPassant capturing on the board
     mov     eax, 1
@@ -2674,6 +2671,7 @@ popBack: ; void popBack (struct Stack *S)
     cmp     DWORD[eax+8], 0
     je      skipUndo
 
+    ; ebx contains move node
     ; size--
     dec     DWORD[eax+8]
     mov     ebx, DWORD[eax+4]
@@ -2692,17 +2690,6 @@ popBack: ; void popBack (struct Stack *S)
         mov     DWORD[eax], 0
         mov     DWORD[eax+4], 0
     popUndo:
-    ;mov     ebx, DWORD[eax+4]
-    ;mov     DWORD[ebx+4], 0
-    ;mov     DWORD[eax+4], ecx
-    ;sub     DWORD[eax+8], 1
-    ;mov     ecx, DWORD[eax]
-    ;mov     edx, 0
-    ;cmp     DWORD[eax+8], 0
-    ;cmove   ecx, edx 
-    ;mov     DWORD[eax], ecx
-
-    ; ebx contains move node
 
     ; restores old game state
     xor     BYTE[playerTurn], 1
@@ -2730,11 +2717,16 @@ popBack: ; void popBack (struct Stack *S)
     ; undoes the castle move
     cmp     BYTE[ebx+10], 0
     je      undoCastleEnd
+        xor     edx, edx
         mov     eax, 1
         mov     ecx, -2
         cmp     BYTE[ebx+10], 1
         cmove   eax, ecx
-        xor     edx, edx
+        mov     ecx, eax
+        or      ecx, 1
+        mov     dl, BYTE[ebx+12]
+        add     ecx, edx
+        mov     BYTE[pieces+ecx], '-'
         mov     dl, BYTE[ebx+13]
         add     eax, edx
         mov     cl, BYTE[ebx+9]
