@@ -30,21 +30,21 @@ segment .data
     color_square2       db  0x1b, "[44m", 0, 0, 0
     color_edge          db  0x1b, "[100m", 0, 0
     color_move          db  0x1b, "[42m", 0
-    color_black         db  0x1b, "[30m", 0, 0, 0
-    color_white         db  0x1b, "[97m", 0
+    color_white         db  0x1b, "[97m", 0, 0, 0
+    color_black         db  0x1b, "[30m", 0
 
-    BPAWN               dw  __utf32__("♟"), 0, 0
-    BROOK               dw  __utf32__("♜"), 0, 0
-    BKNIGHT             dw  __utf32__("♞"), 0, 0
-    BBISH               dw  __utf32__("♝"), 0, 0
-    BQUEEN              dw  __utf32__("♛"), 0, 0
-    BKING               dw  __utf32__("♚"), 0, 0
     WPAWN               dw  __utf32__("♙"), 0, 0
     WROOK               dw  __utf32__("♖"), 0, 0
     WKNIGHT             dw  __utf32__("♘"), 0, 0
     WBISH               dw  __utf32__("♗"), 0, 0
     WQUEEN              dw  __utf32__("♕"), 0, 0
     WKING               dw  __utf32__("♔"), 0, 0
+    BPAWN               dw  __utf32__("♟"), 0, 0
+    BROOK               dw  __utf32__("♜"), 0, 0
+    BKNIGHT             dw  __utf32__("♞"), 0, 0
+    BBISH               dw  __utf32__("♝"), 0, 0
+    BQUEEN              dw  __utf32__("♛"), 0, 0
+    BKING               dw  __utf32__("♚"), 0, 0
     VERT                dw  __utf32__("│"), 0, 0
     HORIZ               dw  __utf32__("─"), 0, 0
     CORNUL              dw  __utf32__("┌"), 0, 0
@@ -75,10 +75,11 @@ segment .data
     frmt_again          db  "Play again? (y/n): ", 0
     frmt_capture1       db  " Captured by white: ", 0
     frmt_capture2       db  " Captured by black: ", 0
-    frmt_promote        db  "Enter a promotion Bishop(b), Rook(r), Knight(h), or Queen (q): ", 0
+    frmt_promote        db  "Enter a promotion Bishop(b), Rook(r), Knight(n), or Queen (q): ", 0
     frmt_intro          db  "Enter an option: ", 0
     frmt_cont           db  "---- Press any key to continue ----", 0
-    memjumparr          db  3,0,0,0,0,0,2,0,0,5,0,0,0,0,0,4,1
+    ;memjumparr          db  3,0,0,0,0,0,2,0,0,5,0,0,0,0,0,4,1
+    memjumparr          db  3,0,0,0,0,0,0,0,0,5,0,0,2,0,0,4,1
     knightarr           dd  -1,-2,1,-2,2,-1,2,1,-1,2,1,2,-2,1,-2,-1
 
 segment .bss
@@ -96,10 +97,10 @@ segment .bss
     prevChar    resb    1
     currChar    resb    1
     xyposCur    resd    1
-    xyposLast1  resd    1
-    xyposLast2  resd    1
-    captureW    resb    5
+    ;xyposLast1  resd    1
+    ;xyposLast2  resd    1
     captureB    resb    5
+    captureW    resb    5
     playerTurn  resb    1
     canCastleW  resb    2
     canCastleB  resb    2
@@ -116,7 +117,6 @@ segment .bss
     wasPas      resb    1
     prevEnPas   resw    1
     enPasTar    resw    1
-
     sStruct     resd    1
     castleInf   resb    1
     enPasTarget resb    1
@@ -397,19 +397,19 @@ seed_start:
     add     esp, 16
 
     mov     BYTE[playerTurn], 0
-    mov     DWORD[xyposLast1], -1
+    ;mov     DWORD[xyposLast1], -1
     mov     WORD[inCheck], 0
     mov     DWORD[captureW], 0
     mov     BYTE[captureW+4], 0
     mov     DWORD[captureB], 0
     mov     BYTE[captureB+4], 0
-    mov     DWORD[canCastleW], 0x01010101
-    mov     BYTE[wasCastle], 0
+    ;mov     DWORD[canCastleW], 0x01010101
+    ;mov     BYTE[wasCastle], 0
     mov     DWORD[errorflag], 0 
     mov     DWORD[round], 1
     mov     BYTE[inGame], 0
-    mov     WORD[wasProm], 0
-    mov     WORD[enPasTar], 0
+    ;mov     WORD[wasProm], 0
+    ;mov     WORD[enPasTar], 0
     mov     BYTE[castleInf], 15
 
     call    clearmoves
@@ -523,12 +523,13 @@ render:
                 shl     eax, 1
                 sub     ecx, eax
                 add     ebx, ecx
-                lea     ebx, [BPAWN+ebx*8]
+                ;lea     ebx, [BPAWN+ebx*8]
+                lea     ebx, [WPAWN+ebx*8]
 
                 ; prints either the char in black or white
                 mov     DWORD[ebp-12], ebx
                 shr     ecx, 2
-                lea     ebx, [color_black+ecx*8]
+                lea     ebx, [color_white+ecx*8]
                 push    ebx
                 call    printf
                 add     esp, 4
@@ -941,25 +942,26 @@ processrook:
     pop     ebp
     ret
 
-; void processpawn(opponent marker (A or a))
+; void processpawn (opponent marker (A or a))
 processpawn:
     push    ebp
     mov     ebp, esp
 
     sub     esp, 8
 
-    ; is used to determine which way the pawn direction is going
-    ; based on the opponent letter A or a
-    mov     eax, 1
-    mov     ebx, -1
-    cmp     BYTE[ebp+8], "A"
-    cmove   eax, ebx
-    mov     DWORD[ebp-4], eax
-    mov     ebx, 1
-    mov     ecx, 6
-    cmp     eax, -1
-    cmovne  ebx, ecx
+    mov     eax, DWORD[playerTurn]
+    xor     eax, 1 
+    mov     ebx, 7
+    lea     ecx, [eax*5]
+    sub     ebx, ecx
+    add     ebx, 48
     mov     DWORD[ebp-8], ebx
+    xor     eax, 1
+
+    mov     ebx, -1
+    cmp     eax, 0
+    cmove   eax, ebx    
+    mov     DWORD[ebp-4], eax  
 
     ; outer lop checks -1, 0, 1 offset of x positions
     mov     ecx, -1
@@ -984,7 +986,6 @@ processpawn:
             ; checks if moving from starting position
             mov     BYTE[markarr+eax], '+'   
             mov     ebx, DWORD[ebp-8]
-            add     ebx, 49
             cmp     BYTE[userin+1], bl
             jne     pawn_bot
 
@@ -1006,35 +1007,27 @@ processpawn:
 
         ; checks diagonal move squares
         diag_moves:
-        cmp     WORD[enPasTar], 0
-        jne     diag_pas
         cmp     BYTE[markarr+eax], '-'
         je      pawn_bot
-            ; checks for capturing opponent on diagonal
-            mov     ebx, DWORD[ebp+8]
-            xor     edx, edx
-            mov     dl, BYTE[pieces+eax]
-            sub     edx, ebx
-            cmp     edx, 0
-            jl      pawn_bot
-            cmp     edx, 26
-            jge     pawn_bot
-
-            mov     BYTE[markarr+eax], '+'
-            jmp     pawn_bot
-
             ; checks for capturing enpassant on diagonal
-            diag_pas:
-            mov     ebx, '8'
-            sub     bl, BYTE[enPasTar+1]
-            shl     ebx, 3
-            mov     dl, BYTE[enPasTar]
-            sub     dl, 'a'
-            add     bl, dl
-            cmp     eax, ebx
-            jne     pawn_bot
+            cmp     BYTE[enPasTarget], al
+            jne     diag_cap
+                mov     BYTE[markarr+eax], "+"
+                jmp     pawn_bot
 
-            mov     BYTE[markarr+eax], "+"
+            ; checks for capturing opponent on diagonal
+            diag_cap:
+            mov     ebx, DWORD[playerTurn]
+            xor     ebx, 1
+            shl     ebx, 5
+            add     ebx, "A"
+            mov     dl, BYTE[pieces+eax]
+            sub     dl, bl
+            cmp     dl, 0
+            jl      pawn_bot
+            cmp     dl, 26
+            jge     pawn_bot
+                mov     BYTE[markarr+eax], '+'
     pawn_bot:
     inc     ecx
     jmp     neo_top
@@ -1318,7 +1311,7 @@ fill_capture:
     sub     ecx, esi
     add     ecx, eax
     add     ebx, ecx
-    lea     ebx, [captureW+ebx]
+    lea     ebx, [captureB+ebx]
     mov     ecx, DWORD[ebp+12]
     add     BYTE[ebx], cl
 
@@ -1508,7 +1501,7 @@ save_intro:
     call    fclose
     add     esp, 4
 
-    mov     DWORD[xyposLast1], -1
+    ;mov     DWORD[xyposLast1], -1
 
     mov     esp, ebp
     pop     ebp
@@ -1862,25 +1855,18 @@ procTurns:
     push    ebp
     mov     ebp, esp
 
-    sub     esp, 8
+    mov     ebx, 32
+    mov     eax, "p"
+    sub     eax, DWORD[ebp+8]
+    cdq
+    div     ebx 
 
-    xor     eax, eax
-    mov     al, BYTE[playerTurn]
-    xor     al, 1
-    shl     eax, 5
-    mov     DWORD[ebp-4], eax
-    mov     al, BYTE[playerTurn]
-    shl     eax, 5
-    add     eax, "A"
-    mov     DWORD[ebp-8], eax
+    cmp     eax, DWORD[playerTurn]
+    je      proc_turn_end
 
-    mov     eax, "P"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn1
-        push    DWORD[ebp-8] 
+    cmp     edx, 0
+    jne     proc_turn1
         call    processpawn
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn1:
     mov     eax, "R"
@@ -1901,7 +1887,7 @@ procTurns:
         add     esp, 4
         jmp     proc_turn_end
     proc_turn3:
-    mov     eax, "H"
+    mov     eax, "N"
     add     eax, DWORD[ebp-4]
     cmp     DWORD[ebp+8], eax
     jne      proc_turn4
@@ -2069,12 +2055,6 @@ save_fen:
             xor     ebx, ebx
         fen_ord:
         mov     dl, BYTE[pieces+ecx]
-        mov     esi, "n"
-        cmp     dl, "h"
-        cmove   edx, esi
-        sub     esi, 32
-        cmp     dl, "H"
-        cmove   edx, esi
         cmp     dl, 96
         jle     fen_swap
             sub     dl, 32
@@ -2267,14 +2247,6 @@ move_to_text:
     cmp     BYTE[currChar], 'P'
     je      convPawn
         mov     bl, BYTE[currChar]
-        cmp     bl, "h"
-        jne     pgn_h1
-            mov     bl, "N"
-        pgn_h1:
-        cmp     bl, "H"
-        jne     pgn_h2
-            mov     bl, "N" 
-        pgn_h2:
         cmp     bl, 96
         jle     pgn_swap
             sub     bl, 32
@@ -2334,14 +2306,8 @@ move_to_text:
         mov     BYTE[pgn+eax], "="
         mov     bl, BYTE[userin]
         sub     bl, 32
-        cmp     bl, "H"
-        jne     contProm
-            mov     BYTE[pgn+eax+1], "N"
-            add     eax, 2
-            jmp     notProm
-        contProm:
-            mov     BYTE[pgn+eax+1], bl
-            add     eax, 2
+        mov     BYTE[pgn+eax+1], bl
+        add     eax, 2
     notProm:
 
     ; Logs checkmate
@@ -2607,7 +2573,7 @@ pushBack: ; void pushBack (struct Stack *S, int currPos, int newPos)
         jne     tryPromoting
             mov     eax, ebx
             sub     eax, edi
-            shr     eax, 1
+            sar     eax, 1
             add     eax, edi
             mov     BYTE[esi+8], al
             jmp     endPawnMoving
@@ -2630,7 +2596,7 @@ pushBack: ; void pushBack (struct Stack *S, int currPos, int newPos)
             mov     bl, BYTE[userin]
             cmp     bl, "r"
             je      promote
-            cmp     bl, "h"
+            cmp     bl, "n"
             je      promote
             cmp     bl, "q"
             je      promote
@@ -2695,8 +2661,14 @@ popBack: ; void popBack (struct Stack *S)
     xor     BYTE[playerTurn], 1
     mov     al, BYTE[ebx+11]
     mov     BYTE[castleInf], al
-    mov     al, BYTE[ebx+8]
-    mov     BYTE[enPasTarget], al
+
+    mov     BYTE[enPasTarget], 0
+    cmp     DWORD[ebx+4], 0
+    je      skipUndoPass
+        mov     eax, DWORD[ebx+4]
+        mov     al, BYTE[eax+8]
+        mov     BYTE[enPasTarget], al
+    skipUndoPass:
 
     mov     eax, DWORD[round]
     mov     ecx, eax
@@ -2731,6 +2703,7 @@ popBack: ; void popBack (struct Stack *S)
         add     eax, edx
         mov     cl, BYTE[ebx+9]
         mov     BYTE[pieces+eax], cl
+        mov     al, cl
         jmp     botUndo
     undoCastleEnd:
 
@@ -2742,12 +2715,12 @@ popBack: ; void popBack (struct Stack *S)
         neg     eax
         add     eax, 96
         mov     cl, BYTE[ebx+9]
-        mov     BYTE[pieces+eax], cl
-
+        mov     BYTE[pieces+ecx], al
+        jmp     botUndo2
     botUndo:
     xor     eax, eax
     mov     al, BYTE[ebx+15]
-
+    botUndo2:
     push    -1
     push    eax
     call    fill_capture
