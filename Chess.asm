@@ -116,7 +116,7 @@ segment .bss
     wasProm     resb    1
     wasPas      resb    1
     prevEnPas   resw    1
-    enPasTar    resw    1
+    ;enPasTar    resw    1
     sStruct     resd    1
     castleInf   resb    1
     enPasTarget resb    1
@@ -421,7 +421,6 @@ seed_start:
 
 ; void render()
 render:
-    ;ret
     push    ebp
     mov     ebp, esp
 
@@ -789,15 +788,15 @@ clearpgn:
     pop     ebp
     ret
 
-; void processlines(increment x, increment y, opponent marker (A or a))
+; void processlines(increment x, increment y)
 processlines:
     push    ebp
     mov     ebp, esp
 
     ; Checks the line until hits a stoping point
-    mov     ecx, 1
     mov     esi, DWORD[ebp+8]
     mov     edi, DWORD[ebp+12]
+
     topprocess:
     push    edi
     push    esi
@@ -808,49 +807,35 @@ processlines:
 
     ; calculates until square does not exist
     cmp     eax, 0x420
-    je      endprocess2
+    je      endprocesslines
 
     ; if the space is open
     cmp     BYTE[pieces+eax], "-"
     je      bottomprocess
 
-    ; jumps if its a uppercase piece being moved
-    cmp     BYTE[ebp+16], "A"
-    jne     processupper
-
-        ; compares with it's own pieces (lowercase)
-        cmp     BYTE[pieces+eax], "Z"
-        jg      endprocess2
-        ; if the piece is able to be captured. Then also end the function
-        cmp     BYTE[pieces+eax], "A"
-        jg      endprocess1
-
-        jmp     bottomprocess
-
-    processupper:
-    ; compares with its own pieces (uppercase)
-    cmp     BYTE[pieces+eax], "Z"
-    jl      endprocess2 
-    ; if the piece is able to be captured. Then also end the function
-    cmp     BYTE[pieces+eax], "a"
-    jg      endprocess1
+    mov     ebx, DWORD[playerTurn]
+    xor     ebx, 1
+    shl     ebx, 5
+    add     ebx, "A"
+    mov     cl, BYTE[pieces+eax]
+    sub     cl, bl
+    cmp     cl, 0
+    jl      endprocesslines
+    cmp     cl, 26
+    jge     endprocesslines
 
     bottomprocess:
     mov     BYTE[markarr+eax], "+"
-
-    inc     ecx
     add     esi, DWORD[ebp+8]
     add     edi, DWORD[ebp+12]
     jmp     topprocess
-    endprocess1:
-    mov     BYTE[markarr+eax], "+"
-    endprocess2:
+    endprocesslines:
 
     mov     esp, ebp
     pop     ebp
     ret
 
-; void processknight (opponent marker (A or a))
+; void processknight ()
 processknight:
     push    ebp
     mov     ebp, esp
@@ -861,11 +846,10 @@ processknight:
     jge     end_kloop
         mov     ecx, DWORD[knightarr+4*ebx]
         mov     edx, DWORD[knightarr+4*(ebx+1)]
-        push    DWORD[ebp+8]
         push    ecx
         push    edx
         call    processmove
-        add     esp, 12
+        add     esp, 8
     add     ebx, 2
     jmp     top_kloop
     end_kloop:
@@ -874,10 +858,11 @@ processknight:
     pop     ebp
     ret
 
-; void processmove (offset x, offset y, opponent marker (A or a))
+; void processmove (offset x, offset y)
 processmove:
     push    ebp
     mov     ebp, esp
+    pusha
 
     push    DWORD[ebp+12]
     push    DWORD[ebp+8]
@@ -892,57 +877,57 @@ processmove:
     cmp     BYTE[pieces+eax], "-"
     je      move_add
 
-    cmp     BYTE[ebp+16], "A"
-    jne     processmove_upper
-        cmp     BYTE[pieces+eax], "Z"
-        jg      end_processmove
-        jmp     move_add
-    processmove_upper:
-        cmp     BYTE[pieces+eax], "Z"
-        jl      end_processmove
+    ; compares with enemy pieces
+    mov     ebx, DWORD[playerTurn]
+    xor     ebx, 1
+    shl     ebx, 5
+    add     ebx, "A"
+    mov     cl, BYTE[pieces+eax]
+    sub     cl, bl
+    cmp     cl, 0
+    jl      end_processmove
+    cmp     cl, 26
+    jge     end_processmove
 
     move_add:
     mov     BYTE[markarr+eax], "+"
     end_processmove:
 
+    popa
     mov     esp, ebp
     pop     ebp
     ret
 
-; void processrook (opponent marker (A or a))
+; void processrook ()
 processrook:
     push    ebp
     mov     ebp, esp
 
-    push    DWORD[ebp+8]
     push    -1
     push    0
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    1
     push    0
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    0
     push    -1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    0
     push    1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
     mov     esp, ebp
     pop     ebp
     ret
 
-; void processpawn (opponent marker (A or a))
+; void processpawn ()
 processpawn:
     push    ebp
     mov     ebp, esp
@@ -1037,40 +1022,36 @@ processpawn:
     pop     ebp
     ret
 
-; void processbishop (opponent marker (A or a))
+; void processbishop ()
 processbishop:
     push    ebp
     mov     ebp, esp
 
-    push    DWORD[ebp+8]
     push    -1
     push    -1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    -1
     push    1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    1
     push    -1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    1
     push    1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
     mov     esp, ebp
     pop     ebp
     ret
 
-; void processking (opponent marker (A or a))
+; void processking ()
 processking:
     push    ebp
     mov     ebp, esp
@@ -1086,11 +1067,10 @@ processking:
         top_inner_proc_king:
         cmp     DWORD[ebp-8], -2
         je      bot_proc_king
-            push    DWORD[ebp+8]
             push    DWORD[ebp-4]
             push    DWORD[ebp-8]
             call    processmove
-            add     esp, 12
+            add     esp, 8
             dec     DWORD[ebp-8]
             jmp     top_inner_proc_king
         bot_proc_king:
@@ -1099,9 +1079,7 @@ processking:
     end_proc_king:
 
     ; checks for castling
-    mov     eax, DWORD[ebp+8]
-    sub     eax, "A"
-    shr     eax, 5
+    mov     eax, DWORD[playerTurn]
     mov     ebx, eax
     xor     ebx, 1
     mov     ecx, ebx
@@ -1855,66 +1833,56 @@ procTurns:
     push    ebp
     mov     ebp, esp
 
-    mov     ebx, 32
-    mov     eax, "p"
-    sub     eax, DWORD[ebp+8]
-    cdq
-    div     ebx 
+    mov     eax, DWORD[playerTurn]
+    shl     eax, 5
+    add     eax, "A"
 
-    cmp     eax, DWORD[playerTurn]
-    je      proc_turn_end
-
-    cmp     edx, 0
+    mov     ebx, 15
+    add     ebx, eax
+    cmp     ebx, DWORD[ebp+8]
     jne     proc_turn1
         call    processpawn
         jmp     proc_turn_end
     proc_turn1:
-    mov     eax, "R"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn2
-        push    DWORD[ebp-8] 
+    
+    mov     ebx, 17
+    add     ebx, eax
+    cmp     ebx, DWORD[ebp+8]
+    jne     proc_turn2
         call    processrook
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn2:
-    mov     eax, "B"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn3
-        push    DWORD[ebp-8] 
+
+    mov     ebx, 1
+    add     ebx, eax
+    cmp     ebx, DWORD[ebp+8]
+    jne     proc_turn3
         call    processbishop
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn3:
-    mov     eax, "N"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn4
-        push    DWORD[ebp-8] 
+
+    mov     ebx, 13
+    add     ebx,eax
+    cmp     ebx, DWORD[ebp+8]
+    jne     proc_turn4
         call    processknight
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn4:
-    mov     eax, "Q"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn5
-        push    DWORD[ebp-8] 
+
+    mov     ebx, 16
+    add     ebx, eax
+    cmp     DWORD[ebp+8], ebx
+    jne     proc_turn5
         call    processrook
-        add     esp, 4
-        push    DWORD[ebp-8] 
         call    processbishop
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn5:
-    mov     eax, "K"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
+
+    mov     ebx, 10
+    add     ebx, eax
+    cmp     DWORD[ebp+8], ebx
     jne      proc_turn_end
-        push    DWORD[ebp-8] 
         call    processking
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn_end:
     mov     ebx, DWORD[ebp+8]
@@ -2020,6 +1988,8 @@ save_fen:
     push    ebp
     mov     ebp, esp
     
+    sub     esp, 4
+
     ; position, count, iteration
     xor     eax, eax
     xor     ebx, ebx
@@ -2055,13 +2025,6 @@ save_fen:
             xor     ebx, ebx
         fen_ord:
         mov     dl, BYTE[pieces+ecx]
-        cmp     dl, 96
-        jle     fen_swap
-            sub     dl, 32
-            jmp     fen_swap2
-        fen_swap:
-            add     dl, 32
-        fen_swap2:
         mov     BYTE[fen+eax], dl
         inc     eax
     bot_fen:
@@ -2069,6 +2032,7 @@ save_fen:
     jmp     top_fen
     end_fen:
 
+    ; stores player turn in fen
     mov     ebx, ' w  '
     mov     ecx, ' b  '
     cmp     BYTE[playerTurn], 1
@@ -2076,66 +2040,69 @@ save_fen:
     mov     DWORD[fen+eax], ebx
     add     eax, 3
 
-    xor     ebx, ebx
-    cmp     BYTE[canCastleW+1], 1
-    jne     fen_castle1
+    test    BYTE[castleInf], 1
+    jz      fenCastleN1
         mov     BYTE[fen+eax], "K"
         inc     eax
-        inc     ebx
-    fen_castle1:
-    cmp     BYTE[canCastleW], 1
-    jne     fen_castle2
+    fenCastleN1:
+    test    BYTE[castleInf], 2
+    jz      fenCastleN2
         mov     BYTE[fen+eax], "Q"
         inc     eax
-        inc     ebx
-    fen_castle2:
-    cmp     BYTE[canCastleB+1], 1
-    jne     fen_castle3
+    fenCastleN2:
+    test    BYTE[castleInf], 4
+    jz      fenCastleN3
         mov     BYTE[fen+eax], "k"
         inc     eax
-        inc     ebx
-    fen_castle3:
-    cmp     BYTE[canCastleB], 1
-    jne     fen_castle4
+    fenCastleN3:
+    test    BYTE[castleInf], 8
+    jz      fenCastleN4
         mov     BYTE[fen+eax], "q"
         inc     eax
-        inc     ebx
-    fen_castle4:
-    cmp     ebx, 0
-    jne     fen_castle5
+    fenCastleN4:
+    test    BYTE[castleInf], 15
+    jnz     fenCastleN5
         mov     BYTE[fen+eax], "-"
-        inc eax
-    fen_castle5:
+        inc     eax
+    fenCastleN5:
 
     mov     BYTE[fen+eax], ' '
-    cmp     WORD[enPasTar], 0
-    jne     fenEn
-        mov     BYTE[fen+eax+1], '-'
-        add     eax, 2
-        jmp     endfenEn
-    fenEn:
-        mov     bx, WORD[enPasTar]
-        mov     WORD[fen+eax+1], bx
-        add     eax, 3
-    endfenEn:
-    mov     WORD[fen+eax], ' 0'
-    mov     BYTE[fen+eax+2], ' '
-
+    inc     eax
     mov     ecx, eax
-    xor     eax, eax
+    mov     ebx, 8
+    mov     al, BYTE[enPasTarget]
+    cmp     eax, 0
+    je      fenNoPass
+        cdq
+        div     ebx
+        sub     ebx, eax
+        add     ebx, "0"
+        mov     BYTE[fen+ecx], dl
+        add     BYTE[fen+ecx], "a"
+        mov     BYTE[fen+ecx+1], bl
+        add     ecx, 2
+        jmp     fenEndPass
+    fenNoPass:
+        mov     BYTE[fen+ecx], '-'
+        inc     ecx
+    fenEndPass:
+    mov     BYTE[fen+ecx], ' '
+    inc     ecx
+
     mov     al, BYTE[round]
-    dec     al
     mov     ebx, 10
     cdq
     div     ebx
     cmp     eax, 0
     je      fenRound
         add     al, 48
-        mov     BYTE[fen+ecx+3], al
+        mov     BYTE[fen+ecx], al
         inc     ecx
     fenRound:
     add     dl, 48
-    mov     BYTE[fen+ecx+3], dl
+    mov     BYTE[fen+ecx], dl
+    inc     ecx
+    mov     DWORD[ebp-4], ecx
 
     ; saves fen to file
     lea     esi, [fen_file]
@@ -2145,7 +2112,7 @@ save_fen:
     add     esp, 8
     lea     ebx, [fen]
     push    eax
-    push    90
+    push    DWORD[ebp-4]
     push    1
     push    ebx
     call    fwrite
@@ -2514,22 +2481,22 @@ pushBack: ; void pushBack (struct Stack *S, int currPos, int newPos)
     and     al, BYTE[castleInf]
 
     mov     edx, 7
-    cmp     BYTE[pieces], "R" 
+    cmp     BYTE[pieces], "r" 
     cmovne  eax, edx
     and     al, BYTE[castleInf]
 
     mov     edx, 11
-    cmp     BYTE[pieces+7], "R" 
+    cmp     BYTE[pieces+7], "r" 
     cmovne  eax, edx
     and     al, BYTE[castleInf]
     
     mov     edx, 13
-    cmp     BYTE[pieces+56], "r" 
+    cmp     BYTE[pieces+56], "R" 
     cmovne  eax, edx
     and     al, BYTE[castleInf]
 
     mov     edx, 14
-    cmp     BYTE[pieces+63], "r" 
+    cmp     BYTE[pieces+63], "R" 
     cmovne  eax, edx
     and     al, BYTE[castleInf]
     mov     BYTE[castleInf], al
