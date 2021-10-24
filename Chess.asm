@@ -120,6 +120,7 @@ segment .bss
     sStruct     resd    1
     castleInf   resb    1
     enPasTarget resb    1
+    halfMove    resb    1
 
 segment .text
 	global  main
@@ -411,6 +412,7 @@ seed_start:
     ;mov     WORD[wasProm], 0
     ;mov     WORD[enPasTar], 0
     mov     BYTE[castleInf], 15
+    mov     BYTE[halfMove], 0
 
     call    clearmoves
     call    clearpgn
@@ -2089,6 +2091,21 @@ save_fen:
     mov     BYTE[fen+ecx], ' '
     inc     ecx
 
+    mov     al, BYTE[halfMove]
+    mov     ebx, 10
+    cdq
+    div     ebx
+    cmp     eax, 0
+    je      fenHalfMove
+        add     al, 48
+        mov     BYTE[fen+ecx], al
+        inc     ecx
+    fenHalfMove:
+    add     dl, 48
+    mov     BYTE[fen+ecx], dl
+    mov     BYTE[fen+ecx+1], ' '
+    add     ecx, 2
+
     mov     al, BYTE[round]
     mov     ebx, 10
     cdq
@@ -2431,6 +2448,9 @@ pushBack: ; void pushBack (struct Stack *S, int currPos, int newPos)
     mov     BYTE[esi+13], bl
     mov     BYTE[esi+14], ch
     mov     BYTE[esi+15], cl
+    mov     al, BYTE[halfMove]
+    mov     BYTE[esi+16], al
+    inc     BYTE[halfMove]
 
     ; moves the pieces on the board
     mov     BYTE[pieces+edi], '-'
@@ -2470,30 +2490,35 @@ pushBack: ; void pushBack (struct Stack *S, int currPos, int newPos)
     ; updates castling information
     xor     eax, eax
     mov     al, BYTE[castleInf]
-    mov     edx, 3
+    mov     edx, 12
     cmp     ch, "K"
     cmove   eax, edx
     and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
 
-    mov     edx, 12
+    mov     edx, 3
     cmp     ch, "k"
     cmove   eax, edx
     and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
 
     mov     edx, 7
     cmp     BYTE[pieces], "r" 
     cmovne  eax, edx
     and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
 
     mov     edx, 11
     cmp     BYTE[pieces+7], "r" 
     cmovne  eax, edx
     and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
     
     mov     edx, 13
     cmp     BYTE[pieces+56], "R" 
     cmovne  eax, edx
     and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
 
     mov     edx, 14
     cmp     BYTE[pieces+63], "R" 
@@ -2586,6 +2611,18 @@ pushBack: ; void pushBack (struct Stack *S, int currPos, int newPos)
     xor     eax, eax
     mov     al, BYTE[esi+15]
 
+    mov     bl, BYTE[esi+14]
+    cmp     bl, "p"
+    je      zeroHalfMove
+    cmp     bl, "P"
+    je      zeroHalfMove
+
+    cmp     al, '-'
+    je      skipHalfMove
+        zeroHalfMove:
+        mov     BYTE[halfMove], 0
+    skipHalfMove:
+
     ; Keeps track of captured pieces
     push    1
     push    eax
@@ -2628,6 +2665,8 @@ popBack: ; void popBack (struct Stack *S)
     xor     BYTE[playerTurn], 1
     mov     al, BYTE[ebx+11]
     mov     BYTE[castleInf], al
+    mov     al, BYTE[ebx+16]
+    mov     BYTE[halfMove], al
 
     mov     BYTE[enPasTarget], 0
     cmp     DWORD[ebx+4], 0
