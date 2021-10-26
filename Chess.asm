@@ -5,13 +5,12 @@
 %define FEN_FILE   'saves/saves.fen'
 %define INIT_FILE  'media/.init'
 %define HEIGHT     15
-%define WIDTH      72 
+%define WIDTH      73
 %define TOPVERT    4  
 %define TOPHORZ    20
 %define ENDVERT    12
 %define ENDHORZ    36 
 %define ENDHORZ2   37
-%define TURNLOC    94
 
 segment .data
     board_file          db  BOARD_FILE, 0
@@ -65,6 +64,7 @@ segment .data
     frmt_spacemate      db  "%46s", 0
     frmt_moves          db  "%.8s", 0
     frmt_moves2         db  "%.6s", 0
+    frmt_pgn            db  " %s", 0
     frmt_print          db  "Enter a move: ", 0
     frmt_print2         db  "Enter a destination: ", 0
     frmt_bcheck         db  "Black in Check", 10, 13, 0
@@ -396,14 +396,13 @@ seed_start:
 
 ; void render()
 render:
-    ;ret
     push    ebp
     mov     ebp, esp
 
     sub     esp, 12
-    push    clear_screen_cmd
-    call    system
-    add     esp, 4
+    ;push    clear_screen_cmd
+    ;call    system
+    ;add     esp, 4
 
     ; prints the turn marker
     xor     eax, eax
@@ -411,9 +410,9 @@ render:
     mov     al, BYTE[playerTurn]
     mul     ebx
     mov     ebx, DWORD[frmt_turn+eax]
-    mov     DWORD[board+94], ebx
+    mov     DWORD[board+95], ebx
     mov     bl, BYTE[frmt_turn+eax+4]
-    mov     BYTE[board+98], bl 
+    mov     BYTE[board+99], bl 
 
     mov     DWORD[ebp-4], 0
     y_loop_start:
@@ -486,8 +485,8 @@ render:
                 cmp     al, "-"
                 je      endprintboard
 
-                ; this converts the character to 14, 16, 6, 0, 15, 9
-                ; points to an array which redirects to the proper memory address
+                ; this converts the character to a number and then points
+                ; to an array which redirects to the proper memory address
                 sub     al, 66
                 mov     ebx, 32
                 cdq
@@ -498,7 +497,6 @@ render:
                 shl     eax, 1
                 sub     ecx, eax
                 add     ebx, ecx
-                ;lea     ebx, [BPAWN+ebx*8]
                 lea     ebx, [WPAWN+ebx*8]
 
                 ; prints either the char in black or white
@@ -563,6 +561,16 @@ render:
             endspecial:
 
             ; prints the log of previous moves
+            cmp     bl, "w"
+            jne     endtrack
+                mov     ebx, DWORD[ebp-4]
+                sub     ebx, 3
+                push    ebx
+                call    printPGN
+                add     esp, 4
+                add     DWORD[ebp-8], eax
+                jmp     x_loop_start
+            ; call    printPGN
             ; Does scrolling too
             ;cmp     bl, "w"
             ;jne     endtrack
@@ -623,7 +631,7 @@ render:
                     ;add     esp, 4
                     ;add     DWORD[ebp-8], 1
                     ;jmp     piece_end
-            ;endtrack:
+            endtrack:
             
             ; Default regular character
             push    ebx     
@@ -1366,7 +1374,7 @@ init_intro:
     intro_read_loop_end:
 
     add     esi, 16
-    add     edi, 1080
+    add     edi, 1095
     inc     DWORD[ebp-12]
 
     push    DWORD[ebp-4]
@@ -2116,12 +2124,14 @@ makenode:
     push    ebp
     mov     ebp, esp
 
-    push    24
+    push    25
     call    malloc
     add     esp, 4
 
     mov     DWORD[eax], 0
     mov     DWORD[eax+4], 0
+    mov     DWORD[eax+17], 0x20202020
+    mov     DWORD[eax+21], 0x00202020
     
     mov     esp, ebp
     pop     ebp
@@ -2653,6 +2663,102 @@ makePGN:
 
     breaker:
     
+    mov     esp, ebp
+    pop     ebp
+    ret
+; void printPGN (int lineNumb) 
+printPGN:
+    push    ebp
+    mov     ebp, esp
+
+    sub     esp, 8
+
+    mov     ebx, DWORD[sStruct]
+    mov     edx, DWORD[ebx+8]
+    mov     ebx, DWORD[ebx]
+    mov     ecx, DWORD[round]
+    cmp     edx, DWORD[ebp+8]
+    jle     replaceW
+    jmp     topScroll
+        replaceW:
+        push    " "
+        call    putchar
+        add     esp, 4
+        mov     eax, 1
+        jmp     skipSecondPGN
+    
+    topScroll:
+    cmp     ecx, 10
+    jle     skipScroll
+        mov     ebx, DWORD[ebx]
+        mov     ebx, DWORD[ebx]
+        dec     ecx
+        jmp     topScroll
+    skipScroll:
+
+    mov     ecx, DWORD[ebp+8]
+    topScroll2:
+    cmp     ecx, 0
+    je      skipScroll2
+        mov     ebx, DWORD[ebx]
+        mov     ebx, DWORD[ebx]
+        dec     ecx
+        jmp     topScroll2
+    skipScroll2:
+    cmp     ebx, 0
+    je      replaceW    
+
+    mov     DWORD[ebp-4], ebx
+    mov     eax, DWORD[round]
+    mov     ecx, 10
+    cdq
+    div     ecx
+    add     eax, 0x30
+    mov     dh, al
+    add     dl, 0x30
+    mov     DWORD[ebp-8], edx
+    cmp     eax, '0'
+    je      notTen
+        push    eax
+        call    putchar
+        add     esp, 4
+        jmp     singleDigit
+    notTen:
+        push    ' '
+        call    putchar
+        add     esp, 4
+    singleDigit:
+    mov     edx, DWORD[ebp-8]
+    mov     dh, 0
+    push    edx
+    call    putchar
+    add     esp, 4
+
+    mov     ebx, DWORD[ebp-4]
+    add     ebx, 17
+    push    ebx
+    push    frmt_pgn
+    call    printf
+    add     esp, 8
+
+    push    VERT
+    push    frmt_unic
+    call    printf
+    add     esp, 8
+
+    mov     eax, 11
+    mov     ebx, DWORD[ebp-4]
+    mov     ebx, DWORD[ebx]
+    cmp     ebx, 0
+    je      skipSecondPGN
+        add     ebx, 17
+        push    ebx
+        push    frmt_reg
+        call    printf
+        add     esp, 8
+        mov     eax, 18
+    skipSecondPGN:
+
     mov     esp, ebp
     pop     ebp
     ret
