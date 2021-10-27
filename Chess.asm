@@ -65,6 +65,7 @@ segment .data
     frmt_moves          db  "%.8s", 0
     frmt_moves2         db  "%.6s", 0
     frmt_pgn            db  " %s", 0
+    frmt_int            db  "%2d", 0
     frmt_print          db  "Enter a move: ", 0
     frmt_print2         db  "Enter a destination: ", 0
     frmt_bcheck         db  "Black in Check", 10, 13, 0
@@ -570,67 +571,6 @@ render:
                 add     esp, 4
                 add     DWORD[ebp-8], eax
                 jmp     x_loop_start
-            ; call    printPGN
-            ; Does scrolling too
-            ;cmp     bl, "w"
-            ;jne     endtrack
-                ;mov     bl, ' '
-                ;mov     eax, DWORD[ebp-4]
-                ;sub     eax, 3
-                ;mov     ecx, DWORD[round] 
-                ;cmp     ecx, 10
-                ;jle     noscroll
-                    ;add     eax, DWORD[round]
-                    ;sub     eax, 10
-                    ;dec     ecx
-                    ;shl     ecx, 4
-                    ;cmp     BYTE[pgn+ecx+1], 48
-                    ;jge     noscroll
-                        ;dec     eax
-                ;noscroll:
-                ;mov     ecx, eax
-                ;shl     ecx, 4
-                ;mov     DWORD[ebp-12], ecx
-                ;cmp     BYTE[pgn+ecx+1], 48
-                ;jl      endtrack
-                    ;lea     edx, [pgn+ecx]
-                    ;push    edx
-                    ;push    frmt_moves
-                    ;call    printf
-                    ;add     esp, 8
-                    ;add     DWORD[ebp-8], 7
-                ;mov     ecx, DWORD[ebp-12]
-                ;cmp     BYTE[pgn+ecx+9], '|'
-                ;jne     endtrack_in
-                    ;xor     edx, edx
-                    ;mov     dl, BYTE[pgn+ecx+8]
-                    ;push    edx
-                    ;call    putchar
-                    ;add     esp, 4
-
-                    ;push    VERT
-                    ;push    frmt_unic
-                    ;call    printf
-                    ;add     esp, 8
-
-                    ;mov     ecx, DWORD[ebp-12]
-                    ;lea     edx, [pgn+ecx+10]
-                    ;push    edx
-                    ;push    frmt_moves2
-                    ;call    printf
-                    ;add     esp, 8
-                    ;add     DWORD[ebp-8], 8
-                    ;jmp     piece_end
-            ;endtrack_in:
-                ;cmp     BYTE[pgn+ecx+8], "+"
-                ;jne     piece_end
-                    ;xor     edx, edx
-                    ;mov     dl, BYTE[pgn+ecx+8]
-                    ;push    edx
-                    ;call    putchar
-                    ;add     esp, 4
-                    ;add     DWORD[ebp-8], 1
-                    ;jmp     piece_end
             endtrack:
             
             ; Default regular character
@@ -790,6 +730,8 @@ processlines:
     jl      endprocesslines
     cmp     cl, 26
     jge     endprocesslines
+    mov     BYTE[markarr+eax], "+"
+    jmp     endprocesslines
 
     bottomprocess:
     mov     BYTE[markarr+eax], "+"
@@ -2167,6 +2109,12 @@ pushBack:
     mov     ebx, DWORD[ebp+8]
     inc     DWORD[ebx+8]
 
+    ; increases the current round
+    mov     ebx, DWORD[ebx+8]
+    shr     ebx, 1
+    inc     ebx
+    mov     DWORD[round], ebx
+
     ; esi - *node
     ; edi - currPos
     ; ebx - newPos
@@ -2628,9 +2576,8 @@ makePGN:
             mov     ebx, 8
             cdq
             div     ebx
-            sub     ebx, eax
             add     edx, "a"
-            mov     BYTE[esi+edi], bl
+            mov     BYTE[esi+edi], dl
             inc     edi
         nopawnPGNcap:
         mov     BYTE[esi+edi], 'x'
@@ -2661,8 +2608,6 @@ makePGN:
     ; if results in check (+)
     ; if results in checkmate (#)
 
-    breaker:
-    
     mov     esp, ebp
     pop     ebp
     ret
@@ -2674,11 +2619,11 @@ printPGN:
     sub     esp, 8
 
     mov     ebx, DWORD[sStruct]
-    mov     edx, DWORD[ebx+8]
     mov     ebx, DWORD[ebx]
     mov     ecx, DWORD[round]
-    cmp     edx, DWORD[ebp+8]
-    jle     replaceW
+    dec     ecx
+    cmp     DWORD[ebp+8], ecx
+    jg      replaceW
     jmp     topScroll
         replaceW:
         push    " "
@@ -2687,7 +2632,10 @@ printPGN:
         mov     eax, 1
         jmp     skipSecondPGN
     
+    ; does scrolling, strips off the starting x amount of lines
     topScroll:
+        breaker:
+    inc     ecx
     cmp     ecx, 10
     jle     skipScroll
         mov     ebx, DWORD[ebx]
@@ -2696,6 +2644,7 @@ printPGN:
         jmp     topScroll
     skipScroll:
 
+    ; breaks off the lines before; gets the current line of objects
     mov     ecx, DWORD[ebp+8]
     topScroll2:
     cmp     ecx, 0
@@ -2708,32 +2657,16 @@ printPGN:
     cmp     ebx, 0
     je      replaceW    
 
+    ; displays the proper turn number at the start of the line
     mov     DWORD[ebp-4], ebx
-    mov     eax, DWORD[round]
-    mov     ecx, 10
-    cdq
-    div     ecx
-    add     eax, 0x30
-    mov     dh, al
-    add     dl, 0x30
-    mov     DWORD[ebp-8], edx
-    cmp     eax, '0'
-    je      notTen
-        push    eax
-        call    putchar
-        add     esp, 4
-        jmp     singleDigit
-    notTen:
-        push    ' '
-        call    putchar
-        add     esp, 4
-    singleDigit:
-    mov     edx, DWORD[ebp-8]
-    mov     dh, 0
-    push    edx
-    call    putchar
-    add     esp, 4
+    mov     eax, DWORD[ebp+8]
+    inc     eax
+    push    eax
+    push    frmt_int
+    call    printf
+    add     esp, 8
 
+    ; prints white's move pgn on that line
     mov     ebx, DWORD[ebp-4]
     add     ebx, 17
     push    ebx
@@ -2741,11 +2674,14 @@ printPGN:
     call    printf
     add     esp, 8
 
+    ; prints te vertical line down the middle
     push    VERT
     push    frmt_unic
     call    printf
     add     esp, 8
 
+    ; checks if black has played a move or not
+    ; if so it prints that out otherwise won't
     mov     eax, 11
     mov     ebx, DWORD[ebp-4]
     mov     ebx, DWORD[ebx]
