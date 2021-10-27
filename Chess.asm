@@ -62,8 +62,6 @@ segment .data
     frmt_spacesave      db  "%36s", 0
     frmt_spacecheck     db  "%42s", 0
     frmt_spacemate      db  "%46s", 0
-    frmt_moves          db  "%.8s", 0
-    frmt_moves2         db  "%.6s", 0
     frmt_pgn            db  " %s", 0
     frmt_int            db  "%2d", 0
     frmt_print          db  "Enter a move: ", 0
@@ -94,7 +92,6 @@ segment .bss
     select      resb    1
     selectFlag  resb    1
     errorflag   resd    1
-    currChar    resb    1
     xyposCur    resd    1
     captureB    resb    5
     captureW    resb    5
@@ -401,9 +398,9 @@ render:
     mov     ebp, esp
 
     sub     esp, 12
-    ;push    clear_screen_cmd
-    ;call    system
-    ;add     esp, 4
+    push    clear_screen_cmd
+    call    system
+    add     esp, 4
 
     ; prints the turn marker
     xor     eax, eax
@@ -2624,23 +2621,25 @@ printPGN:
     dec     ecx
     cmp     DWORD[ebp+8], ecx
     jg      replaceW
-    jmp     topScroll
+    jmp     keepW
         replaceW:
         push    " "
         call    putchar
         add     esp, 4
         mov     eax, 1
         jmp     skipSecondPGN
+    keepW:
     
     ; does scrolling, strips off the starting x amount of lines
+    add     ecx, DWORD[playerTurn]
+    xor     edx, edx
     topScroll:
-        breaker:
-    inc     ecx
     cmp     ecx, 10
     jle     skipScroll
         mov     ebx, DWORD[ebx]
         mov     ebx, DWORD[ebx]
         dec     ecx
+        inc     edx
         jmp     topScroll
     skipScroll:
 
@@ -2661,6 +2660,7 @@ printPGN:
     mov     DWORD[ebp-4], ebx
     mov     eax, DWORD[ebp+8]
     inc     eax
+    add     eax, edx
     push    eax
     push    frmt_int
     call    printf
