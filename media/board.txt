@@ -1,15 +1,15 @@
-                                                                 _:_    
-     ()               Black's Turn              moves           '-.-'   
-  .-:--:-.                                  VVVVVVTVVVVVV      __.'.__  
-   \____/         SONNNNNNNNNNNNNNNNPS   w        U           |_______| 
-   {====}       8 SM                MS   w        U            \=====/  
-    )__(        7 SM                MS   w        U             )___(   
-   /____\       6 SM                MS   w        U            /_____\  
-    |  |        5 SM                MS   w        U             |   |   
-    |  |        4 SM                MS   w        U             |   |   
-    |  |        3 SM                MS   w        U             |   |   
-    |  |        2 SM                MS   w        U             |   |   
-   /____\       1 SM                MS   w        U            /_____\  
-  (======)        SQNNNNNNNNNNNNNNNNRS   w        U           (=======) 
-  }======{          a b c d e f g h                           }======={ 
- (________)                                                  (_________)
+                                                                  _:_    
+     ()               Black's Turn               moves           '-.-'   
+  .-:--:-.                                  VVVVVVVTVVVVVVV     __.'.__  
+   \____/         SONNNNNNNNNNNNNNNNPS   w         U           |_______| 
+   {====}       8 SM                MS   w         U            \=====/  
+    )__(        7 SM                MS   w         U             )___(   
+   /____\       6 SM                MS   w         U            /_____\  
+    |  |        5 SM                MS   w         U             |   |   
+    |  |        4 SM                MS   w         U             |   |   
+    |  |        3 SM                MS   w         U             |   |   
+    |  |        2 SM                MS   w         U             |   |   
+   /____\       1 SM                MS   w         U            /_____\  
+  (======)        SQNNNNNNNNNNNNNNNNRS   w         U           (=======) 
+  }======{          a b c d e f g h                            }======={ 
+ (________)                                                   (_________)
