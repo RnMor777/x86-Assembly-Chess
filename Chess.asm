@@ -23,6 +23,10 @@ segment .data
     mode_w              db  "w", 0
     raw_mode_on_cmd     db  "stty raw -echo", 0
     raw_mode_off_cmd    db  "stty -raw echo", 0
+    initSys             db  "stty -echo -icanon", 0 
+    initMouse      db  "echo '",0x1b,"[?1003h",0x1b,"[?1015h",0x1b,"[?1006h'",0x1b,"[?25l",0
+    resSys              db  "stty echo icanon", 0 
+    resMouse       db  "echo '",0x1b,"[?1003l",0x1b,"[?1015l",0x1b,"[?1006l'",0x1b,"[?25h",0
     clear_screen_cmd    db  "clear", 0
     color_normal        db  0x1b, "[0m", 0
     color_square1       db  0x1b, "[104m", 0, 0
@@ -57,7 +61,8 @@ segment .data
     frmt_reg            db  "%s", 0
     newline             db  10, 0
     frmt_locale         db  "", 0
-    frmt_scan           db  "%c%d", 0
+    frmt_delim          db  ";", 0
+    frmt_Mm             db  "Mm", 0
     frmt_space          db  " ", 0
     frmt_spacesave      db  "%36s", 0
     frmt_spacecheck     db  "%42s", 0
@@ -121,8 +126,9 @@ segment .text
     extern  setlocale
     extern  malloc
     extern  free
-    ;extern  stdin
-    ;extern  fgets
+    extern  strtok
+    extern  atoi
+    extern  fcntl
 
 ; main()
 main:
@@ -139,6 +145,13 @@ main:
     call    seed_start
     call    makestack
     mov     DWORD[sStruct], eax
+    
+    push    initSys
+    call    system
+    add     esp, 4
+    push    initMouse
+    call    system
+    add     esp, 4
 
     ; runs the initial start screen
     jmp     game_loop
@@ -206,14 +219,11 @@ main:
         call    render
         call    clearmoves
 
-        push    frmt_print
-        call    printf
-        add     esp, 4
+        ;push    frmt_print
+        ;call    printf
+        ;add     esp, 4
    
-        push    userin
-        push    frmt_reg
-        call    scanf
-        add     esp, 8
+        call    getUserIn
     
         ; Exit function by entering an x
         mov     al, BYTE[userin]
@@ -257,8 +267,8 @@ main:
             call    procTurns
             add     esp, 4
 
-        call    sieve_check
-        call    sieve_castle
+        ;call    sieve_check
+        ;call    sieve_castle
 
         ; Calculates the number of moves for the selected piece
         call    calcnumbmoves
@@ -268,21 +278,19 @@ main:
         ; Re-renders showing highlighted move spaces
         game_next:
         call    render
-        push    frmt_print2
-        call    printf
-        add     esp, 4
+        ;push    frmt_print2
+        ;call    printf
+        ;add     esp, 4
 
         ; STEP 2: Get the destination square
-        push    userin
-        push    frmt_reg
-        call    scanf
-        add     esp, 8
+        call    getUserIn
 
         ; Just clears the board
         cmp     BYTE[userin], 'z'
         je      game_bottom
 
         ; Convert to integer values and then does the moving/loading
+        ; pushBack is used to handle all the moving and saving the move in a node
         call    convertpoint
         cmp     eax, 0x420
         je      game_next
@@ -299,14 +307,15 @@ main:
         game_bottom:
 
         ; Calc Check Function
-        push    0
-        call    bwcalc_check
-        add     esp, 4
+        ; Sees if the king for either side is in check
+        ;push    0
+        ;call    bwcalc_check
+        ;add     esp, 4
 
         ; calls function to calculate check
-        push    32
-        call    bwcalc_check
-        add     esp, 4
+        ;push    32
+        ;call    bwcalc_check
+        ;add     esp, 4
 
         ; checks if checkmate
         cmp     BYTE[inCheck], 0
@@ -347,6 +356,12 @@ main:
         call    seed_start
         jmp     game_loop
     again_loop_end:
+    push    resSys
+    call    system
+    add     esp, 4
+    push    resMouse
+    call    system
+    add     esp, 4
 
 	; *********** CODE ENDS HERE ***********
     popa
@@ -1451,12 +1466,14 @@ processlinescheck:
     lea     ecx, [eax*8]
     sub     ebx, ecx
     
+    ; stores into ebp-4, ebp-8 the y and x positions of the king
     mov     DWORD[ebp-4], eax
     mov     DWORD[ebp-8], ebx
     mov     esi, DWORD[ebp+8]
     mov     edi, DWORD[ebp+12]
 
     topprocesscheck:
+    ; calculates valid move square of the offset
     push    edi
     push    esi
     push    DWORD[ebp-4]
@@ -1468,17 +1485,22 @@ processlinescheck:
     je      endprocesscheck
     cmp     BYTE[pieces+eax], "-"
     je      botprocesscheck
-        mov     ebx, "Z"
-        add     ebx, DWORD[ebp+16]
         xor     ecx, ecx
         mov     cl, BYTE[pieces+eax]
-        sub     ecx, ebx
+        mov     ebx, DWORD[ebp+16]
+        sub     cl, bl
+        
+        ;mov     ebx, "Z"
+        ;add     ebx, DWORD[ebp+16]
+        ;xor     ecx, ecx
+        ;mov     cl, BYTE[pieces+eax]
+        ;sub     ecx, ebx
 
         ; checks condition if the piece is an enemy or not
-        cmp     ecx, 0
-        jg      n_check
-        cmp     ecx, -32
-        jle     n_check
+        ;cmp     ecx, 0
+        ;jg      n_check
+        ;cmp     ecx, -32
+        ;jle     n_check
         jmp     endprocesscheck
         
         n_check:
@@ -1555,9 +1577,12 @@ bwcalc_check:
     push    ebp
     mov     ebp, esp
 
+    ; ebp-4: loopvar 1, runs lines
+    ; ebp-8: loopvar 2, runs lines
+    ; ebp-12: stores the offset in pieces array of the king
     sub     esp, 12
 
-    ; finds the (x,y) of the king
+    ; finds the location of either B or W king
     mov     eax, 0
     mov     ebx, "K"
     add     ebx, DWORD[ebp+8]
@@ -1569,7 +1594,7 @@ bwcalc_check:
     bot_bcheck:
     mov     DWORD[ebp-12], eax
 
-    ; process lines to pieces
+    ; process lines to pieces from the king move spot
     mov     DWORD[ebp-4], 1
     check_loop_top:
     cmp     DWORD[ebp-4], -2
@@ -1578,6 +1603,7 @@ bwcalc_check:
         check_loop_inner:
         cmp     DWORD[ebp-8], -2
         je      check_loop_bot
+            ; process lines of check (Rook, Bishop, Queen, etc.)
             push    DWORD[ebp-12]
             push    DWORD[ebp+8]
             push    DWORD[ebp-8]
@@ -2694,6 +2720,185 @@ printPGN:
         add     esp, 8
         mov     eax, 18
     skipSecondPGN:
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+; char nonblockgetchar ()
+nonblockgetchar:
+    push    ebp
+    mov     ebp, esp
+
+	sub		esp, 8
+
+	push	0
+	push	4
+	push	0
+	call	fcntl
+	add		esp, 12
+	mov		DWORD [ebp-4], eax
+
+	or		DWORD [ebp-4], 2048
+	push	DWORD [ebp-4]
+	push	4
+	push    0
+	call	fcntl
+	add		esp, 12
+
+	call	getchar
+	mov		DWORD [ebp-8], eax
+
+	xor		DWORD [ebp-4], 2048
+	push	DWORD [ebp-4]
+	push	4
+	push	0
+	call	fcntl
+	add		esp, 12
+
+	mov		eax, DWORD [ebp-8]
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; int processgetchar (char* array)
+processgetchar:
+    push    ebp
+    mov     ebp, esp
+
+    sub     esp, 8
+    mov     DWORD[ebp-4], 0
+    
+    topGetCharLoop:
+    call    nonblockgetchar
+    mov     DWORD[ebp-8], eax  
+
+    xor     eax, eax
+    mov     ebx, DWORD[ebp-8]
+    cmp     bl, -1
+    je      endGetCharLoop
+
+    mov     ecx, DWORD[ebp+8]
+    mov     edx, DWORD[ebp-4]
+    mov     BYTE[ecx+edx], bl
+    inc     DWORD[ebp-4]
+
+    cmp     bl, 'M'
+    je      returnGetChar
+    cmp     bl, 'm'
+    je      returnGetChar
+    cmp     bl, 'u'
+    je      returnGetChar
+    cmp     bl, 'z'
+    je      returnGetChar
+    cmp     bl, 'x'
+    je      returnGetChar
+    cmp     bl, 's'
+    je      returnGetChar
+    cmp     bl, '?'
+    je      returnGetChar
+    jmp     botGetCharLoop
+    returnGetChar:
+        mov     eax, edx
+        inc     eax
+        jmp     endGetCharLoop
+    botGetCharLoop:
+    jmp     topGetCharLoop
+    endGetCharLoop:
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; void getUserIn ()
+getUserIn:
+    push    ebp
+    mov     ebp, esp
+
+    sub     esp, 32
+    push    17
+    call    malloc
+    add     esp, 4
+
+    mov     DWORD[ebp-4], eax
+    mov     DWORD[ebp-8], eax
+    add     DWORD[ebp-8], 3
+
+    topScanLoop:
+    push    DWORD[ebp-4]
+    call    processgetchar
+    add     esp, 4
+    mov     DWORD[ebp-16], eax
+    cmp     eax, 0
+    je      topScanLoop
+    cmp     eax, 1
+    jne     processMouse
+        mov     ebx, DWORD[ebp-4]
+        mov     al, BYTE[ebx]
+        mov     BYTE[userin], al
+        jmp     endScanLoop
+    processMouse:
+    mov     ebx, DWORD[ebp-4]
+    xor     ecx, ecx
+    mov     cl, BYTE[ebx+eax-1]
+    mov     DWORD[ebp-32], ecx
+
+    push    frmt_delim
+    push    DWORD[ebp-8]
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-20], eax
+
+    push    frmt_delim
+    push    0
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-24], eax
+
+    push    frmt_Mm
+    push    0
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-28], eax
+
+    cmp     DWORD[ebp-20], 2
+    jne     contMouseIf
+        mov     BYTE[userin], 'z'
+        jmp     endScanLoop
+    contMouseIf:
+    cmp     DWORD[ebp-20], 0
+    jne     topScanLoop
+    cmp     DWORD[ebp-32], "M"
+    jne     topScanLoop
+    cmp     DWORD[ebp-24], 21
+    jl      topScanLoop
+    cmp     DWORD[ebp-24], 36
+    jg      topScanLoop
+    cmp     DWORD[ebp-28], 5
+    jl      topScanLoop
+    cmp     DWORD[ebp-28], 12
+    jg      topScanLoop
+        mov     eax, DWORD[ebp-28]
+        sub     eax, 5
+        mov     ebx, 8
+        sub     ebx, eax
+        add     ebx, "0"
+        mov     BYTE[userin+1], bl
+        mov     eax, DWORD[ebp-24]
+        sub     eax, 21
+        shr     eax, 1
+        add     eax, "a"
+        mov     BYTE[userin], al
+        mov     BYTE[userin+2], 0
+    endScanLoop:
 
     mov     esp, ebp
     pop     ebp
