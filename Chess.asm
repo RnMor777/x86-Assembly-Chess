@@ -71,8 +71,8 @@ segment .data
     frmt_int            db  "%2d", 0
     frmt_print          db  "Enter a move: ", 0
     frmt_print2         db  "Enter a destination: ", 0
-    frmt_bcheck         db  "Black in Check", 10, 13, 0
-    frmt_wcheck         db  "White in Check", 10, 13, 0
+    frmt_bcheck         db  "White in Check", 10, 13, 0
+    frmt_wcheck         db  "Black in Check", 10, 13, 0
     frmt_turn           db  "WhiteBlack"
     frmt_saved          db  "Saved",0
     frmt_mate           db  "Checkmate - Game Over!", 10, 13, 0
@@ -81,7 +81,7 @@ segment .data
     frmt_capture2       db  " Captured by black: ", 0
     frmt_promote        db  "Enter a promotion Bishop(b), Rook(r), Knight(n), or Queen (q): ", 0
     frmt_intro          db  "Enter an option: ", 0
-    frmt_cont           db  "---- Press any key to continue ----", 0
+    frmt_cont           db  "---- Press q to continue ----", 0
     memjumparr          db  3,0,0,0,0,0,0,0,0,5,0,0,2,0,0,4,1
     knightarr           dd  -1,-2,1,-2,2,-1,2,1,-1,2,1,2,-2,1,-2,-1
 
@@ -184,7 +184,6 @@ main:
 
     ; loads a saved game
     game_load:
-        call    save_intro
         jmp     game_bottom
 
     ; runs the instruction screen
@@ -197,16 +196,10 @@ main:
     call    printf
     add     esp, 4
 
-    push    raw_mode_on_cmd
-    call    system
-    add     esp, 4
-
-    call    getchar
-    call    getchar
-
-    push    raw_mode_off_cmd
-    call    system
-    add     esp, 4
+    topStructWait: 
+    call    getUserIn
+    cmp     BYTE[userin], 'q'
+    jne     topStructWait
     
     cmp     BYTE[inGame], 1
     je      game_loop
@@ -238,7 +231,6 @@ main:
         cmp     al, 's'
         jne      save_func2
             mov     DWORD[errorflag], 0x777
-            ;call    save_current
             call    save_fen
             jmp     game_bottom
         save_func2:
@@ -267,8 +259,8 @@ main:
             call    procTurns
             add     esp, 4
 
-        ;call    sieve_check
-        ;call    sieve_castle
+        call    sieve_check
+        call    sieve_castle
 
         ; Calculates the number of moves for the selected piece
         call    calcnumbmoves
@@ -278,9 +270,6 @@ main:
         ; Re-renders showing highlighted move spaces
         game_next:
         call    render
-        ;push    frmt_print2
-        ;call    printf
-        ;add     esp, 4
 
         ; STEP 2: Get the destination square
         call    getUserIn
@@ -312,28 +301,28 @@ main:
 
         ; Calc Check Function
         ; Sees if the king for either side is in check
-        ;push    0
-        ;call    bwcalc_check
-        ;add     esp, 4
+        push    0
+        call    bwcalc_check
+        add     esp, 4
 
         ; calls function to calculate check
-        ;push    32
-        ;call    bwcalc_check
-        ;add     esp, 4
+        push    32
+        call    bwcalc_check
+        add     esp, 4
 
         ; checks if checkmate
-        ;cmp     BYTE[inCheck], 0
-        ;je      skip_mate
-            ;push    0 
-            ;call    procCheckmate
-            ;add     esp, 4
-        ;skip_mate:
-        ;cmp     BYTE[inCheck+1], 0
-        ;je      skip_mate2
-            ;push    32
-            ;call    procCheckmate
-            ;add     esp, 4
-        ;skip_mate2:
+        cmp     BYTE[inCheck], 0
+        je      skip_mate
+            push    0 
+            call    procCheckmate
+            add     esp, 4
+        skip_mate:
+        cmp     BYTE[inCheck+1], 0
+        je      skip_mate2
+            push    32
+            call    procCheckmate
+            add     esp, 4
+        skip_mate2:
 
         ; cleans up
         call    clearmoves
@@ -1007,7 +996,11 @@ processking:
     end_proc_king:
 
     ; checks for castling
+    xor     eax, eax
     mov     al, BYTE[playerTurn]
+    cmp     BYTE[inCheck+eax], 1
+    je      endCastle
+
     mov     ebx, eax
     xor     ebx, 1
     mov     ecx, ebx
@@ -1349,117 +1342,6 @@ init_intro:
     pop     ebp
     ret
 
-; void save_intro() 
-save_intro:
-    push    ebp
-    mov     ebp, esp
-
-    lea     esi, [save_file]
-    lea     edi, [pieces]
-
-    sub     esp, 4
-
-    push    mode_r
-    push    esi
-    call    fopen
-    add     esp, 8
-    mov     DWORD[ebp-4], eax
-
-    ; loads in the pieces array
-    push    DWORD[ebp-4]
-    push    64
-    push    1
-    push    edi
-    call    fread
-    add     esp, 16
-
-    ; loads in saved capture data for white
-    lea     ebx, [captureW]
-
-    push    DWORD[ebp-4]
-    push    5
-    push    1
-    push    ebx
-    call    fread
-    add     esp, 16
-
-    ; loads in saved capture data for black
-    lea     ebx, [captureB]
-
-    push    DWORD[ebp-4]
-    push    5
-    push    1
-    push    ebx
-    call    fread
-    add     esp, 16
-    ; loads in turn data and castling info
-    ; takes advantage of how variables are stored in memory next to each other
-    lea     ebx, [playerTurn] 
-
-    push    DWORD[ebp-4]
-    push    5
-    push    1
-    push    ebx
-    call    fread
-    add     esp, 16
-
-    push    DWORD[ebp-4]
-    call    fclose
-    add     esp, 4
-
-    ;mov     DWORD[xyposLast1], -1
-
-    mov     esp, ebp
-    pop     ebp
-    ret
-
-; void save_current ()
-save_current:
-    push    ebp
-    mov     ebp, esp
-
-    sub     esp, 4
-    lea     esi, [save_file]
-
-    push    mode_w
-    push    esi
-    call    fopen
-    add     esp, 8
-    mov     DWORD[ebp-4], eax
-
-    ; writes the board to the file
-    lea     ebx, [pieces]
-    push    DWORD[ebp-4]
-    push    64
-    push    1
-    push    ebx
-    call    fwrite
-    add     esp, 16
-
-    lea     ebx, [captureW]
-    push    DWORD[ebp-4]
-    push    10
-    push    1
-    push    ebx
-    call    fwrite
-    add     esp, 16
-
-    lea     ebx, [playerTurn]
-    push    DWORD[ebp-4]
-    push    5
-    push    1
-    push    ebx
-    call    fwrite
-    add     esp, 16
-
-    push    DWORD[ebp-4]
-    call    fclose
-    add     esp, 4
-
-    mov     esp, ebp
-    pop     ebp
-    ret
-
 ; void processlinescheck(int inc_x, int inc_y, int mark_offset, int init_pos)
 processlinescheck:
     push    ebp
@@ -1493,50 +1375,44 @@ processlinescheck:
     je      endprocesscheck
     cmp     BYTE[pieces+eax], "-"
     je      botprocesscheck
-        xor     ecx, ecx
-        mov     cl, BYTE[pieces+eax]
-        mov     ebx, DWORD[ebp+16]
-        sub     cl, bl
-        
-        ;mov     ebx, "Z"
-        ;add     ebx, DWORD[ebp+16]
-        ;xor     ecx, ecx
-        ;mov     cl, BYTE[pieces+eax]
-        ;sub     ecx, ebx
-
         ; checks condition if the piece is an enemy or not
-        ;cmp     ecx, 0
-        ;jg      n_check
-        ;cmp     ecx, -32
-        ;jle     n_check
-        jmp     endprocesscheck
-        
-        n_check:
+        xor     ebx, ebx
+        mov     ebx, "z"
+        sub     ebx, DWORD[ebp+16]
+        sub     bl, BYTE[pieces+eax]
+        cmp     bl, 26
+        jg      endprocesscheck
+        cmp     bl, 0
+        jl      endprocesscheck
+
         mov     ebx, DWORD[ebp+8]
         add     ebx, DWORD[ebp+12]
         xor     ecx, ecx
 
+        ; if the piece was a queen
         mov     cl, "q"
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax], cl
         je      needcheck
 
+        ; if the piece moving on a row (i.e. a rook)
         cmp     ebx, 1
-        je      r_c
+        je      rookCheck
         cmp     ebx, -1
-        je      r_c
+        je      rookCheck
+
+        ; otherwise the piece will be a bishop 
         mov     cl, "b"
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax],cl
         je      needcheck
         jmp     endprocesscheck
 
-        r_c:
+        rookCheck:
         mov     cl, "r"
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax], cl
         je      needcheck
-
         jmp     endprocesscheck
 
     botprocesscheck:
@@ -1568,11 +1444,11 @@ processchecksquare:
     mov     ebx, DWORD[ebp+24]
     cmp     BYTE[pieces+eax], bl
     jne     endnext
-        cmp     bl, 97
-        jge     black_check
+        cmp     bl, "a"
+        jge     white_check
             mov     BYTE[inCheck+1], 1
             jmp     endnext
-        black_check:
+        white_check:
             mov     BYTE[inCheck], 1
     endnext:
 
@@ -1619,6 +1495,8 @@ bwcalc_check:
             call    processlinescheck
             add     esp, 16
     
+            ; if in check eax will be 0x800
+            ; stores that value into the inCheck value 
             shr     eax, 11
             mov     ebx, DWORD[ebp+8]
             shr     ebx, 5
@@ -1648,6 +1526,7 @@ bwcalc_check:
     shr     ecx, 4
     mov     edx, 1
     sub     edx, ecx
+    neg     edx
 
     push    ebx
     push    edx
@@ -1665,7 +1544,7 @@ bwcalc_check:
     call    processchecksquare
     add     esp, 20
 
-    mov     ebx, "h"
+    mov     ebx, "n"
     sub     ebx, DWORD[ebp+8]
     mov     DWORD[ebp-12], ebx
 
@@ -1701,7 +1580,7 @@ sieve_check:
     xor     ebx, ebx
     xor     edx, edx
     mov     dl, BYTE[playerTurn]
-    xor     dl, 1
+    ;xor     dl, 1
     mov     bl, BYTE[inCheck+edx]
     mov     DWORD[ebp-16], ebx
 
@@ -1733,7 +1612,7 @@ sieve_check:
 
         ; based on player turn to check function
         mov     dl, BYTE[playerTurn]
-        xor     dl, 1
+        ;xor     dl, 1
         shl     edx, 5
 
         push    edx
@@ -1743,7 +1622,7 @@ sieve_check:
         ; see if check is still true after the movement
         xor     edx, edx
         mov     dl, BYTE[playerTurn]
-        xor     dl, 1
+        ;xor     dl, 1
         mov     ecx, DWORD[ebp-8]
         cmp     BYTE[inCheck+edx], 1
         jne     if_sieve
@@ -1858,20 +1737,21 @@ procCheckmate:
         mov     DWORD[xpos], edx
         mov     DWORD[ypos], eax
 
-        ; moves the piece into ebx and finds difference between that and "Z"+piece
-        mov     eax, DWORD[ebp+8]
-        add     eax, "Z"
+        ; checks condition if the piece is an enemy or not
         xor     ebx, ebx
-        mov     bl, BYTE[pieces+ecx]
-        sub     eax, ebx
-
-        cmp     eax, 0
-        jl      bot_mate_loop
-        cmp     eax, 26
+        mov     ebx, "z"
+        mov     eax, DWORD[ebp+8]
+        xor     eax, 32
+        sub     ebx, eax
+        sub     bl, BYTE[pieces+ecx]
+        cmp     bl, 26
         jg      bot_mate_loop
+        cmp     bl, 0
+        jl      bot_mate_loop
 
             ; process the turn for that char
-            push    ebx
+            mov     al, BYTE[pieces+ecx]
+            push    eax
             call    procTurns
             add     esp, 4
 
@@ -1903,15 +1783,18 @@ sieve_castle:
     push    ebp
     mov     ebp, esp
 
+    ; retrieves the piece at the current location 
+    ; converts eax to be be a positive number no matter what
     mov     ebx, DWORD[xyposCur]
     xor     eax, eax
     mov     al, BYTE[pieces+ebx]
     sub     eax, 91
-
     cdq
     xor     eax, edx
     sub     eax, edx
 
+    ; compares with 16 which would indicate the move was a king
+    ; sieves off the further move square so the king can't move through check
     cmp     eax, 16
     jne     end_castle_sieve
         cmp     BYTE[markarr+ebx+1], ""
