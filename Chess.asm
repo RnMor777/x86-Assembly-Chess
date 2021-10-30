@@ -238,7 +238,7 @@ main:
         cmp     al, 's'
         jne      save_func2
             mov     DWORD[errorflag], 0x777
-            call    save_current
+            ;call    save_current
             call    save_fen
             jmp     game_bottom
         save_func2:
@@ -318,18 +318,18 @@ main:
         ;add     esp, 4
 
         ; checks if checkmate
-        cmp     BYTE[inCheck], 0
-        je      skip_mate
-            push    0 
-            call    procCheckmate
-            add     esp, 4
-        skip_mate:
-        cmp     BYTE[inCheck+1], 0
-        je      skip_mate2
-            push    32
-            call    procCheckmate
-            add     esp, 4
-        skip_mate2:
+        ;cmp     BYTE[inCheck], 0
+        ;je      skip_mate
+            ;push    0 
+            ;call    procCheckmate
+            ;add     esp, 4
+        ;skip_mate:
+        ;cmp     BYTE[inCheck+1], 0
+        ;je      skip_mate2
+            ;push    32
+            ;call    procCheckmate
+            ;add     esp, 4
+        ;skip_mate2:
 
         ; cleans up
         call    clearmoves
@@ -2290,9 +2290,10 @@ pushBack:
             call    printf
             add     esp, 4
             push    userin
-            push    frmt_reg
-            call    scanf
-            add     esp, 8
+            ;push    frmt_reg
+            ;call    scanf
+            ;add     esp, 8
+            call    getUserIn
             
             mov     bl, BYTE[userin]
             cmp     bl, "r"
@@ -2309,8 +2310,9 @@ pushBack:
             mov     esi, DWORD[ebp-4]
             xor     eax, eax
             mov     al, BYTE[esi+13]
-            mov     ecx, eax
-            and     ecx, 32
+            mov     ecx, DWORD[playerTurn]
+            xor     ecx, 1
+            shl     ecx, 5
             sub     bl, cl
             mov     BYTE[pieces+eax], bl
     endPawnMoving:
@@ -2796,6 +2798,14 @@ processgetchar:
     cmp     bl, 's'
     je      returnGetChar
     cmp     bl, '?'
+    je      returnGetChar
+    cmp     bl, 'q'
+    je      returnGetChar
+    cmp     bl, 'n'
+    je      returnGetChar
+    cmp     bl, 'b'
+    je      returnGetChar
+    cmp     bl, 'r'
     je      returnGetChar
     jmp     botGetCharLoop
     returnGetChar:
