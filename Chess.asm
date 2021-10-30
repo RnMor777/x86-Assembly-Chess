@@ -2262,6 +2262,8 @@ pushBack:
     cmove   eax, edx
     cmp     eax, 0
     jne     endPawnMoving
+    cmp     BYTE[enPasTarget], 0
+    je      tryEnPassant
     mov     al, BYTE[enPasTarget]
     cmp     bl, al
     jne     tryEnPassant
@@ -2307,10 +2309,6 @@ pushBack:
             push    frmt_promote
             call    printf
             add     esp, 4
-            push    userin
-            ;push    frmt_reg
-            ;call    scanf
-            ;add     esp, 8
             call    getUserIn
             
             mov     bl, BYTE[userin]
