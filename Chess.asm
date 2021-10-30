@@ -98,15 +98,15 @@ segment .bss
     selectFlag  resb    1
     errorflag   resd    1
     xyposCur    resd    1
+    round       resd    1
+    sStruct     resd    1
     captureB    resb    5
     captureW    resb    5
     playerTurn  resb    1
     inCheck     resb    2
     fen         resb    90
-    round       resd    1
     inGame      resb    1
     didMove     resb    1
-    sStruct     resd    1
     castleInf   resb    1
     enPasTarget resb    1
     halfMove    resb    1
@@ -121,8 +121,8 @@ segment .text
     extern  fopen
     extern  fread
     extern  fwrite
-    extern  fgetc
     extern  fclose
+    extern  fgetc
     extern  setlocale
     extern  malloc
     extern  free
@@ -219,11 +219,11 @@ main:
         call    render
         call    clearmoves
 
-        ;push    frmt_print
-        ;call    printf
-        ;add     esp, 4
-   
         call    getUserIn
+        ;push    userin
+        ;push    frmt_reg 
+        ;call    scanf
+        ;add     esp, 8
     
         ; Exit function by entering an x
         mov     al, BYTE[userin]
@@ -284,6 +284,10 @@ main:
 
         ; STEP 2: Get the destination square
         call    getUserIn
+        ;push    userin
+        ;push    frmt_reg 
+        ;call    scanf
+        ;add     esp, 8
 
         ; Just clears the board
         cmp     BYTE[userin], 'z'
@@ -426,6 +430,7 @@ render:
     mov     DWORD[board+95], ebx
     mov     bl, BYTE[frmt_turn+eax+4]
     mov     BYTE[board+99], bl 
+    xor     ecx, ecx
 
     mov     DWORD[ebp-4], 0
     y_loop_start:
@@ -732,7 +737,8 @@ processlines:
     cmp     BYTE[pieces+eax], "-"
     je      bottomprocess
 
-    mov     ebx, DWORD[playerTurn]
+    xor     ebx, ebx
+    mov     bl, BYTE[playerTurn]
     xor     ebx, 1
     shl     ebx, 5
     add     ebx, "A"
@@ -799,7 +805,7 @@ processmove:
     je      move_add
 
     ; compares with enemy pieces
-    mov     ebx, DWORD[playerTurn]
+    mov     bl, BYTE[playerTurn]
     xor     ebx, 1
     shl     ebx, 5
     add     ebx, "A"
@@ -855,7 +861,7 @@ processpawn:
 
     sub     esp, 8
 
-    mov     eax, DWORD[playerTurn]
+    mov     al, BYTE[playerTurn]
     xor     eax, 1 
     mov     ebx, 7
     lea     ecx, [eax*5]
@@ -923,7 +929,8 @@ processpawn:
 
             ; checks for capturing opponent on diagonal
             diag_cap:
-            mov     ebx, DWORD[playerTurn]
+            xor     ebx, ebx
+            mov     bl, BYTE[playerTurn]
             xor     ebx, 1
             shl     ebx, 5
             add     ebx, "A"
@@ -1000,7 +1007,7 @@ processking:
     end_proc_king:
 
     ; checks for castling
-    mov     eax, DWORD[playerTurn]
+    mov     al, BYTE[playerTurn]
     mov     ebx, eax
     xor     ebx, 1
     mov     ecx, ebx
@@ -1452,6 +1459,7 @@ save_current:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void processlinescheck(int inc_x, int inc_y, int mark_offset, int init_pos)
 processlinescheck:
     push    ebp
@@ -1681,6 +1689,7 @@ bwcalc_check:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void sieve_check ()
 sieve_check:
     push    ebp
@@ -1760,12 +1769,13 @@ sieve_check:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void procTurns(char piece)
 procTurns:
     push    ebp
     mov     ebp, esp
 
-    mov     eax, DWORD[playerTurn]
+    mov     al, BYTE[playerTurn]
     shl     eax, 5
     add     eax, "A"
 
@@ -1822,6 +1832,7 @@ procTurns:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void procCheckmate(int player)
 procCheckmate:
     push    ebp
@@ -1886,6 +1897,7 @@ procCheckmate:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void sieve_castle ()
 sieve_castle:
     push    ebp
@@ -1915,12 +1927,13 @@ sieve_castle:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void save_fen()
 save_fen: 
     push    ebp
     mov     ebp, esp
     
-    sub     esp, 4
+    sub     esp, 8
 
     ; position, count, iteration
     xor     eax, eax
@@ -2057,6 +2070,7 @@ save_fen:
     push    esi
     call    fopen
     add     esp, 8
+    mov     DWORD[ebp-8], eax
     lea     ebx, [fen]
     push    eax
     push    DWORD[ebp-4]
@@ -2064,10 +2078,14 @@ save_fen:
     push    ebx
     call    fwrite
     add     esp, 16
+    push    DWORD[ebp-8]
+    call    fclose
+    add     esp, 4
 
     mov     esp, ebp
     pop     ebp
     ret
+
 ; struct stackPointer *makestack()
 makestack: 
     push    ebp
@@ -2310,7 +2328,7 @@ pushBack:
             mov     esi, DWORD[ebp-4]
             xor     eax, eax
             mov     al, BYTE[esi+13]
-            mov     ecx, DWORD[playerTurn]
+            mov     cl, BYTE[playerTurn]
             xor     ecx, 1
             shl     ecx, 5
             sub     bl, cl
@@ -2477,7 +2495,7 @@ makePGN:
     sub     al, "A"
     div     ebx
     mov     ecx, edx
-    add     ecx, "A"
+    add     cl, "A"
     mov     DWORD[ebp-4], ecx
 
     ; creates [ebp-20] storing initial move file (e.g a)
@@ -2529,10 +2547,10 @@ makePGN:
     ; piece in different file can move to the same spot
     mov     DWORD[ebp-12], esi
     mov     DWORD[ebp-16], edi
-    xor     DWORD[playerTurn], 1
+    xor     BYTE[playerTurn], 1
     call    clearmoves
     mov     eax, DWORD[ebp-4]
-    mov     ebx, DWORD[playerTurn]
+    mov     bl, BYTE[playerTurn]
     shl     ebx, 5
     add     eax, ebx
     push    eax
@@ -2540,7 +2558,7 @@ makePGN:
     add     esp, 4
     mov     esi, DWORD[ebp-12]
     mov     edi, DWORD[ebp-16]
-    xor     DWORD[playerTurn], 1
+    xor     BYTE[playerTurn], 1
 
     ; need to fix to be the starting column not the ending column
     ; puts into cx the file (e.g. abcdefgh)
@@ -2636,6 +2654,7 @@ makePGN:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void printPGN (int lineNumb) 
 printPGN:
     push    ebp
@@ -2659,7 +2678,7 @@ printPGN:
     keepW:
     
     ; does scrolling, strips off the starting x amount of lines
-    add     ecx, DWORD[playerTurn]
+    add     cl, BYTE[playerTurn]
     xor     edx, edx
     topScroll:
     cmp     ecx, 10
@@ -2726,6 +2745,7 @@ printPGN:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; char nonblockgetchar ()
 nonblockgetchar:
     push    ebp
