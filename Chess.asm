@@ -137,7 +137,7 @@ main:
 
     ; scans in all of the files, sets up unicode, and defaults
     ; prepares the terminal for mouse input
-    ; creates the dll which holds all previous moves
+    ; creates the doubly linked list which holds all previous moves
     call    init_intro    	
     push    frmt_locale
     push    0x6
@@ -153,7 +153,8 @@ main:
     call    system
     add     esp, 4
 
-    ; runs the initial start screen
+    ; runs the initial start screen and takes in clicks or keyboard
+    ; input to do the selected menu item
     start_intro:
     push    introboard 
     call    render_intro
@@ -169,15 +170,13 @@ main:
     je      struc_loop
     cmp     BYTE[userin], 'i'
     je      struc_loop
-    ;cmp     BYTE[userin], 7
-    ;je      game_load
     cmp     BYTE[userin], 8
     je      again_loop_end
     cmp     BYTE[userin], "q"
     je      again_loop_end
     jmp     start_intro
 
-    ; runs the instruction screen
+    ; runs the instruction screen and waits until q or click to move on
     struc_loop:
     mov     BYTE[userin], 0
     push    strucboard
@@ -186,7 +185,6 @@ main:
     push    frmt_cont
     call    printf
     add     esp, 4
-
     topStructWait: 
     call    getUserIn
     cmp     BYTE[userin], 'z'
@@ -195,29 +193,25 @@ main:
     je      game_loop
     jmp     start_intro
 
-    ; actual game start
+    ; This is where the main game actually starts
     game_loop:
+        ; sets gameStatus and waits on the user to do something
         mov     BYTE[inGame], 1
         mov     BYTE[didMove], 0
         call    render
         call    clearmoves
-
         call    getUserIn
-        ;push    userin
-        ;push    frmt_reg 
-        ;call    scanf
-        ;add     esp, 8
     
-        ; Exit function by entering an x
+        ; If the user pressed q then quits
         mov     al, BYTE[userin]
         cmp     al, 'q'
         je      again_loop_end
 
-        ; Loads Instruction page
+        ; If the user press i then loads Instruction page
         cmp     al, 'i'
         je      struc_loop
 
-        ; Saves the game
+        ; If the user press s then saves the game state
         cmp     al, 's'
         jne      save_func2
             mov     DWORD[errorflag], 0x777
@@ -225,7 +219,7 @@ main:
             jmp     game_bottom
         save_func2:
 
-        ; runs an undo function for the last move
+        ; If the user pressed u then runs an undo function for the last move
         cmp     al, 'u'
         jne     end_undo
             push    DWORD[sStruct]
@@ -239,32 +233,29 @@ main:
         cmp     eax, 0x420
         je      game_bottom
 
+        ; stores the location of the piece that the user input, if the piece
+        ; was just a blank spot then skips, otherwise if processes the turn for the
+        ; input piece and sieves off any moves that result in check
         mov     DWORD[xyposCur], eax
         xor     ebx, ebx
         mov     bl, BYTE[pieces+eax]
-    
         cmp     bl, "-"
         je      game_bottom
             push    ebx
             call    procTurns
             add     esp, 4
-
         call    sieve_check
         call    sieve_castle
-
-        ; Calculates the number of moves for the selected piece
         call    calcnumbmoves
         cmp     eax, 0
         je      game_bottom
 
-        ; Re-renders showing highlighted move spaces
+        ; STEP 2: Get the destination square
         game_next:
         call    render
-
-        ; STEP 2: Get the destination square
         call    getUserIn
 
-        ; Just clears the board
+        ; If the user pressed z then exit out of the piece selection
         cmp     BYTE[userin], 'z'
         je      game_bottom
 
@@ -283,27 +274,30 @@ main:
             add     esp, 12
         game_bottom:
 
-        ; cleans up
+        ; cleans up the move array and checks for checkmate
         call    clearmoves
-
         cmp     DWORD[errorflag], 0xAA
-        je      game_loop_end
+        je      again_loop
         jmp     game_loop
-    game_loop_end:
+
+    ; when checkmate occurs, the user is prompted to play again or not
     again_loop:
-        call    render
-        push    frmt_again
-        call    printf
-        add     esp, 4
-        call    getUserIn
+    call    render
+    push    frmt_again
+    call    printf
+    add     esp, 4
+    call    getUserIn
     cmp     BYTE[userin], "y"
     je      start_game
     cmp     BYTE[userin], "n"
     je      again_loop_end
     jmp     again_loop
     start_game:
-        call    seed_start
-        jmp     game_loop
+    call    seed_start
+    jmp     game_loop
+
+    ; when ever the game is exited or quit, runs these function to clean up the bash
+    ; shell and restore normal defaults
     again_loop_end:
     push    resSys
     call    system
