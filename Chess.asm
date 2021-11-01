@@ -1,7 +1,6 @@
 %define BOARD_FILE 'media/board.txt'
 %define INTRO_FILE 'media/intro.txt'
 %define STRUC_FILE 'media/instructions.txt'
-%define SAVE_FILE  'saves/saves.txt'
 %define FEN_FILE   'saves/saves.fen'
 %define INIT_FILE  'media/.init'
 %define HEIGHT     15
@@ -16,7 +15,6 @@ segment .data
     board_file          db  BOARD_FILE, 0
     intro_file          db  INTRO_FILE, 0
     struc_file          db  STRUC_FILE, 0
-    save_file           db  SAVE_FILE, 0
     init_file           db  INIT_FILE, 0
     fen_file            db  FEN_FILE, 0
     mode_r              db  "r", 0
@@ -28,13 +26,14 @@ segment .data
     resSys              db  "stty echo icanon", 0 
     resMouse       db  "echo '",0x1b,"[?1003l",0x1b,"[?1015l",0x1b,"[?1006l'",0x1b,"[?25h",0
     clear_screen_cmd    db  "clear", 0
-    color_normal        db  0x1b, "[0m", 0
+    color_normal        db  0x1b, "[0;24m", 0
     color_square1       db  0x1b, "[104m", 0, 0
     color_square2       db  0x1b, "[44m", 0, 0, 0
     color_edge          db  0x1b, "[100m", 0, 0
     color_move          db  0x1b, "[42m", 0
     color_white         db  0x1b, "[97m", 0, 0, 0
     color_black         db  0x1b, "[30m", 0
+    color_hover         db  0x1b, "[44;4m", 0
 
     WPAWN               dw  __utf32__("♙"), 0, 0
     WROOK               dw  __utf32__("♖"), 0, 0
@@ -81,7 +80,7 @@ segment .data
     frmt_capture2       db  " Captured by black: ", 0
     frmt_promote        db  "Enter a promotion Bishop(b), Rook(r), Knight(n), or Queen (q): ", 0
     frmt_intro          db  "Enter an option: ", 0
-    frmt_cont           db  "---- Press q to continue ----", 0
+    frmt_cont           db  "---- Right Click or z to continue ----", 0
     memjumparr          db  3,0,0,0,0,0,0,0,0,5,0,0,2,0,0,4,1
     knightarr           dd  -1,-2,1,-2,2,-1,2,1,-1,2,1,2,-2,1,-2,-1
 
@@ -137,6 +136,8 @@ main:
 	; ********** CODE STARTS HERE **********
 
     ; scans in all of the files, sets up unicode, and defaults
+    ; prepares the terminal for mouse input
+    ; creates the dll which holds all previous moves
     call    init_intro    	
     push    frmt_locale
     push    0x6
@@ -145,7 +146,6 @@ main:
     call    seed_start
     call    makestack
     mov     DWORD[sStruct], eax
-    
     push    initSys
     call    system
     add     esp, 4
@@ -154,53 +154,43 @@ main:
     add     esp, 4
 
     ; runs the initial start screen
-    jmp     game_loop
-
     start_intro:
     push    introboard 
     call    render_intro
     add     esp, 4
 
-    push    frmt_intro
-    call    printf
-    add     esp, 4
-    
-    push    userin
-    push    frmt_reg
-    call    scanf
-    add     esp, 8
+    call    getUserIn2
 
-    mov     ebx, 0
-    mov     bl, BYTE[userin]
-    cmp     bl, '1'
+    cmp     BYTE[userin], 5
     je      game_loop
-    cmp     bl, '2'
+    cmp     BYTE[userin], 'p'
+    je      game_loop
+    cmp     BYTE[userin], 6
     je      struc_loop
-    cmp     bl, '3'
-    je      game_load      
-    cmp     bl, '4'
+    cmp     BYTE[userin], 'i'
+    je      struc_loop
+    ;cmp     BYTE[userin], 7
+    ;je      game_load
+    cmp     BYTE[userin], 8
+    je      again_loop_end
+    cmp     BYTE[userin], "q"
     je      again_loop_end
     jmp     start_intro
 
-    ; loads a saved game
-    game_load:
-        jmp     game_bottom
-
     ; runs the instruction screen
     struc_loop:
+    mov     BYTE[userin], 0
     push    strucboard
     call    render_intro
     add     esp, 4
-
     push    frmt_cont
     call    printf
     add     esp, 4
 
     topStructWait: 
     call    getUserIn
-    cmp     BYTE[userin], 'q'
+    cmp     BYTE[userin], 'z'
     jne     topStructWait
-    
     cmp     BYTE[inGame], 1
     je      game_loop
     jmp     start_intro
@@ -220,11 +210,11 @@ main:
     
         ; Exit function by entering an x
         mov     al, BYTE[userin]
-        cmp     al, 'x'
+        cmp     al, 'q'
         je      again_loop_end
 
         ; Loads Instruction page
-        cmp     al, '?'
+        cmp     al, 'i'
         je      struc_loop
 
         ; Saves the game
@@ -273,10 +263,6 @@ main:
 
         ; STEP 2: Get the destination square
         call    getUserIn
-        ;push    userin
-        ;push    frmt_reg 
-        ;call    scanf
-        ;add     esp, 8
 
         ; Just clears the board
         cmp     BYTE[userin], 'z'
@@ -295,34 +281,7 @@ main:
             push    DWORD[sStruct]
             call    pushBack
             add     esp, 12
-            mov     BYTE[didMove], 1
-            xor     BYTE[playerTurn], 1
         game_bottom:
-
-        ; Calc Check Function
-        ; Sees if the king for either side is in check
-        push    0
-        call    bwcalc_check
-        add     esp, 4
-
-        ; calls function to calculate check
-        push    32
-        call    bwcalc_check
-        add     esp, 4
-
-        ; checks if checkmate
-        cmp     BYTE[inCheck], 0
-        je      skip_mate
-            push    0 
-            call    procCheckmate
-            add     esp, 4
-        skip_mate:
-        cmp     BYTE[inCheck+1], 0
-        je      skip_mate2
-            push    32
-            call    procCheckmate
-            add     esp, 4
-        skip_mate2:
 
         ; cleans up
         call    clearmoves
@@ -336,10 +295,7 @@ main:
         push    frmt_again
         call    printf
         add     esp, 4
-        push    userin
-        push    frmt_reg
-        call    scanf
-        add     esp, 8
+        call    getUserIn
     cmp     BYTE[userin], "y"
     je      start_game
     cmp     BYTE[userin], "n"
@@ -1245,14 +1201,31 @@ render_intro:
             mov		ebx, 0
             mov     esi, DWORD[ebp+8]
             lea     esi, [esi]
-            mov		bl, BYTE [esi + eax] ;introboard + eax]
+            mov		bl, BYTE [esi + eax]
 
-            cmp     bl, '%'
-            jne     intro_x_endif
-                push    copysymbol
-                push    frmt_unic
+            mov     al, BYTE[userin]
+            add     al, '0'
+            cmp     al, bl
+            jne     intro_x_endif1
+                push    frmt_space
                 call    printf
-                add     esp, 8
+                add     esp, 4
+                push    color_hover
+                call    printf
+                add     esp, 4
+                jmp     intro_x_bottom
+            intro_x_endif1:
+
+            cmp     bl, '1'
+            jl      intro_x_endif
+            cmp     bl, '5'
+            jg      intro_x_endif
+                push    color_normal
+                call    printf
+                add     esp, 4
+                push    frmt_space
+                call    printf
+                add     esp, 4
                 jmp     intro_x_bottom
             intro_x_endif:
             push	ebx
@@ -2239,6 +2212,32 @@ pushBack:
     call    fill_capture
     add     esp, 8
 
+    mov     BYTE[didMove], 1
+    xor     BYTE[playerTurn], 1
+
+    ; Sees if the king for either side is in check
+    ; Runs twice to calculate for both side 0 - white, 32 - black
+    push    0
+    call    bwcalc_check
+    add     esp, 4
+    push    32
+    call    bwcalc_check
+    add     esp, 4
+
+    ; If the king is in check, then proceed to process checkmate if possible
+    cmp     BYTE[inCheck], 0
+    je      skip_mate
+        push    0 
+        call    procCheckmate
+        add     esp, 4
+    skip_mate:
+    cmp     BYTE[inCheck+1], 0
+    je      skip_mate2
+        push    32
+        call    procCheckmate
+        add     esp, 4
+    skip_mate2:
+
     ; Makes PGN
     push    DWORD[ebp-4]
     call    makePGN
@@ -2520,17 +2519,30 @@ makePGN:
     mov     bl, BYTE[pieces+eax]
     mov     al, BYTE[esi+14]
     cmp     al, bl
-    je      notPGNProm
+    je      PGNbot
         mov     BYTE[esi+edi], "="
         mov     BYTE[esi+edi+1], bl
         add     edi, 2
-    notPGNProm:
-
-    ; the bottom of the function, adds if it was check or checkmate
     PGNbot:
+
+    ; adds + for check and # for checkmate to the pgn
+    mov     eax, 0
+    mov     ebx, "+"
+    mov     ecx, "#"
+    cmp     BYTE[inCheck], 1
+    cmove   eax, ebx
+    cmp     BYTE[inCheck], 1
+    cmove   eax, ebx
+    cmp     DWORD[errorflag], 0xAA
+    cmove   eax, ecx
+    cmp     eax, 0
+    je      noCheckPGN
+        mov     BYTE[esi+edi], al
+        inc     edi
+    noCheckPGN:
+
+    ; cleans up moves just in case anything weird got done
     call    clearmoves
-    ; if results in check (+)
-    ; if results in checkmate (#)
 
     mov     esp, ebp
     pop     ebp
@@ -2688,33 +2700,13 @@ processgetchar:
 
     cmp     bl, 'M'
     je      returnGetChar
-    cmp     bl, 'm'
-    je      returnGetChar
-    cmp     bl, 'u'
-    je      returnGetChar
+    cmp     bl, 'a'
+    jl      topGetCharLoop
     cmp     bl, 'z'
-    je      returnGetChar
-    cmp     bl, 'x'
-    je      returnGetChar
-    cmp     bl, 's'
-    je      returnGetChar
-    cmp     bl, '?'
-    je      returnGetChar
-    cmp     bl, 'q'
-    je      returnGetChar
-    cmp     bl, 'n'
-    je      returnGetChar
-    cmp     bl, 'b'
-    je      returnGetChar
-    cmp     bl, 'r'
-    je      returnGetChar
-    jmp     botGetCharLoop
+    jg      topGetCharLoop
     returnGetChar:
         mov     eax, edx
         inc     eax
-        jmp     endGetCharLoop
-    botGetCharLoop:
-    jmp     topGetCharLoop
     endGetCharLoop:
     mov     esp, ebp
     pop     ebp
@@ -2810,8 +2802,107 @@ getUserIn:
         mov     BYTE[userin], al
         mov     BYTE[userin+2], 0
     endScanLoop:
+    push    DWORD[ebp-4]
+    call    free
+    add     esp, 4
 
     mov     esp, ebp
+    pop     ebp
+    ret
+; void getUserIn2 ()
+getUserIn2:
+    push    ebp
+    mov     ebp, esp
+
+    sub     esp, 32
+    push    17
+    call    malloc
+    add     esp, 4
+
+    mov     DWORD[ebp-4], eax
+    mov     DWORD[ebp-8], eax
+    add     DWORD[ebp-8], 3
+
+    topScanLoop2:
+    mov     BYTE[userin], 0
+    push    DWORD[ebp-4]
+    call    processgetchar
+    add     esp, 4
+    mov     DWORD[ebp-16], eax
+    cmp     eax, 0
+    je      topScanLoop2
+    cmp     eax, 1
+    jne     processMouse2
+        mov     ebx, DWORD[ebp-4]
+        mov     al, BYTE[ebx]
+        mov     BYTE[userin], al
+        jmp     endScanLoop2
+    processMouse2:
+    mov     ebx, DWORD[ebp-4]
+    xor     ecx, ecx
+    mov     cl, BYTE[ebx+eax-1]
+    mov     DWORD[ebp-32], ecx
+
+    push    frmt_delim
+    push    DWORD[ebp-8]
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-20], eax
+
+    push    frmt_delim
+    push    0
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-24], eax
+
+    push    frmt_Mm
+    push    0
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-28], eax
+
+    cmp     DWORD[ebp-28], 9
+    jle     endScanLoop2 
+    cmp     DWORD[ebp-28], 14
+    jge     endScanLoop2
+    cmp     DWORD[ebp-24], 32
+    jl      endScanLoop2
+    cmp     DWORD[ebp-24], 43
+    jg      endScanLoop2
+
+    cmp     DWORD[ebp-20], 0
+    je      clickIntro
+    cmp     DWORD[ebp-20], 35
+    je      hoverIntro
+    jmp     topScanLoop2
+
+    clickIntro:
+    mov     eax, DWORD[ebp-28]
+    sub     eax, 5
+    mov     BYTE[userin], al
+    jmp     endScanLoop2
+
+    hoverIntro:
+    mov     eax, DWORD[ebp-28]
+    sub     eax, 9
+    mov     BYTE[userin], al
+
+    endScanLoop2:
+    push    DWORD[ebp-4]
+    call    free
+    add     esp, 4
+
+    mov     esp, ebp
+
     pop     ebp
     ret
 ; vim:ft=nasm
