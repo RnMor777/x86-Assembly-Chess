@@ -128,6 +128,7 @@ segment .text
     extern  strtok
     extern  atoi
     extern  fcntl
+    extern  usleep
 
 ; main()
 main:
@@ -2721,6 +2722,9 @@ getUserIn:
     add     DWORD[ebp-8], 3
 
     topScanLoop:
+    push    500
+    call    usleep
+    add     esp, 4
     push    DWORD[ebp-4]
     call    processgetchar
     add     esp, 4
@@ -2818,6 +2822,9 @@ getUserIn2:
     add     DWORD[ebp-8], 3
 
     topScanLoop2:
+    push    500
+    call    usleep
+    add     esp, 4
     mov     BYTE[userin], 0
     push    DWORD[ebp-4]
     call    processgetchar
