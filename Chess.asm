@@ -144,8 +144,6 @@ main:
     call    setlocale
     add     esp, 8
     call    seed_start
-    call    makestack
-    mov     DWORD[sStruct], eax
     push    initSys
     call    system
     add     esp, 4
@@ -317,14 +315,14 @@ seed_start:
     push    ebp
     mov     ebp, esp
 
+    ; opens the file called init in the media folder
+    ; this is used to scan in the starting positions into the pieces array
     lea     esi, [init_file]
     lea     edi, [pieces]
-
     push    mode_r
     push    esi
     call    fopen
     add     esp, 8
-
     push    eax
     push    64
     push    1
@@ -332,6 +330,10 @@ seed_start:
     call    fread
     add     esp, 16
 
+    ; initializes all the variables necessary to their starting values
+    call    clearmoves
+    call    makestack
+    mov     DWORD[sStruct], eax
     mov     BYTE[playerTurn], 0
     mov     WORD[inCheck], 0
     mov     DWORD[captureW], 0
@@ -344,8 +346,6 @@ seed_start:
     mov     BYTE[castleInf], 15
     mov     BYTE[halfMove], 0
 
-    call    clearmoves
-
     mov     esp, ebp
     pop     ebp
     ret
@@ -355,12 +355,14 @@ render:
     push    ebp
     mov     ebp, esp
 
+    ; clears the command line screen so nothing is left on it
     sub     esp, 12
     push    clear_screen_cmd
     call    system
     add     esp, 4
 
-    ; prints the turn marker
+    ; prints the turn marker by finding the word black or white in frmt_turn and
+    ; overwritting the position on the board to be that new word
     xor     eax, eax
     mov     ebx, 5
     mov     al, BYTE[playerTurn]
@@ -371,6 +373,7 @@ render:
     mov     BYTE[board+99], bl 
     xor     ecx, ecx
 
+    ; goes into a double for loop that traverses the entire board array while printing it
     mov     DWORD[ebp-4], 0
     y_loop_start:
     cmp     DWORD[ebp-4], HEIGHT
@@ -426,7 +429,7 @@ render:
                 add     ecx, edx
                 mov     DWORD[ebp-12], ecx
 
-                ; sets the color is the square is to be highlighted
+                ; sets the color if the square is to be highlighted
                 cmp     BYTE[markarr+ecx], "+"
                 jne     selectedcolorend
                     push    color_move
@@ -497,15 +500,17 @@ render:
             jl      to_color     
                 sub     DWORD[ebp-12], 8 
                 jmp     colorless
+
+            ; this prints the color of the edge and the character to white
             to_color:
             push    color_edge
             call    printf
             add     esp, 4
-
             push    color_white
             call    printf
             add     esp, 4
 
+            ; prints the unique unicode character based on an offset from VERT character
             colorless:
             mov     ebx, DWORD[ebp-12]
             sub     ebx, 77
@@ -529,29 +534,29 @@ render:
                 jmp     x_loop_start
             endtrack:
             
-            ; Default regular character
-            push    ebx     
-            call    putchar
-            add     esp, 4
+        ; Default regular character
+        push    ebx     
+        call    putchar
+        add     esp, 4
 
-            piece_end:
-            push    color_normal
-            call    printf
-            add     esp, 4
+        ; resets the color to normal
+        piece_end:
+        push    color_normal
+        call    printf
+        add     esp, 4
         inc     DWORD[ebp-8]
         jmp     x_loop_start
 
-        x_loop_end:
-        push    0x0d
-        call    putchar
-        add     esp, 4
-        push    0x0a
-        call    putchar
-        add     esp, 4
+    ; when the x position is done, print a newline
+    x_loop_end:
+    push    0x0a
+    call    putchar
+    add     esp, 4
     inc     DWORD[ebp-4]
     jmp     y_loop_start
     y_loop_end:
 
+    ; prints special messages after words like: checkmate, in check, saved
     cmp     DWORD[errorflag], 0xAA
     jne     err_next
         push    frmt_mate
@@ -583,6 +588,7 @@ render:
         mov     DWORD[errorflag], 0
     err_next3:
 
+    ; prints all the captured pieces by calling a print captured function
     push    newline
     call    printf
     add     esp, 4
@@ -601,7 +607,6 @@ calc_square:
     mov     ebp, esp    
 
     sub     esp, 4
-
     mov     eax, DWORD[ebp+12]
     add     eax, DWORD[ebp+20]
 
@@ -611,10 +616,10 @@ calc_square:
     cmp     eax, 7
     jg      errSquare    
 
-    shl     eax, 3
-    mov     DWORD[ebp-4], eax
-    mov     eax, DWORD[ebp+8]
-    add     eax, DWORD[ebp+16]
+        shl     eax, 3
+        mov     DWORD[ebp-4], eax
+        mov     eax, DWORD[ebp+8]
+        add     eax, DWORD[ebp+16]
     
     ; Makes sure the move is within the x bounds
     cmp     eax, 0
@@ -622,9 +627,11 @@ calc_square:
     cmp     eax, 7
     jg      errSquare
     
-    add     eax, DWORD[ebp-4]
-    jmp     regEnd
+        ; puts into eax the value of the xy combined position, aka the array offset
+        add     eax, DWORD[ebp-4]
+        jmp     regEnd
 
+    ; returns 0x420 if the square is not valid
     errSquare:
     mov     eax, 0x420
     regEnd:
@@ -638,8 +645,9 @@ clearmoves:
     push    ebp
     mov     ebp, esp
 
+    ; loops over the markarr and sets it all to 0, clearing possible moves
     mov     BYTE[selectFlag], 0x0
-    mov     ecx, 0
+    xor     ecx, ecx
     startclear:
     cmp     ecx, 64
     jge     endclear
@@ -656,10 +664,11 @@ processlines:
     push    ebp
     mov     ebp, esp
 
-    ; Checks the line until hits a stoping point
     mov     esi, DWORD[ebp+8]
     mov     edi, DWORD[ebp+12]
 
+    ; calculates the square (if possible) at that increment of x and y
+    ; calls calc_square to figure this out 
     topprocess:
     push    edi
     push    esi
@@ -667,8 +676,6 @@ processlines:
     push    DWORD[xpos]
     call    calc_square
     add     esp, 16
-
-    ; calculates until square does not exist
     cmp     eax, 0x420
     je      endprocesslines
 
@@ -676,6 +683,7 @@ processlines:
     cmp     BYTE[pieces+eax], "-"
     je      bottomprocess
 
+    ; if the space can be captured (an opponent's piece)
     xor     ebx, ebx
     mov     bl, BYTE[playerTurn]
     xor     ebx, 1
@@ -687,8 +695,9 @@ processlines:
     jl      endprocesslines
     cmp     cl, 26
     jge     endprocesslines
-    mov     BYTE[markarr+eax], "+"
-    jmp     endprocesslines
+
+        mov     BYTE[markarr+eax], "+"
+        jmp     endprocesslines
 
     bottomprocess:
     mov     BYTE[markarr+eax], "+"
@@ -706,6 +715,9 @@ processknight:
     push    ebp
     mov     ebp, esp
 
+    ; process the move to a possible knight square
+    ; a knight square is an L shape, so everything is held in an array
+    ; to make it easier to keep track of where to check next
     mov     ebx, 0
     top_kloop:
     cmp     ebx, 16
@@ -730,14 +742,13 @@ processmove:
     mov     ebp, esp
     pusha
 
+    ; checks if it's a valid movement (lands on the board)
     push    DWORD[ebp+12]
     push    DWORD[ebp+8]
     push    DWORD[ypos]
     push    DWORD[xpos]
     call    calc_square
     add     esp, 16
-
-    ; checks if it's a valid movement
     cmp     eax, 0x420
     je      end_processmove
     cmp     BYTE[pieces+eax], "-"
@@ -755,6 +766,7 @@ processmove:
     cmp     cl, 26
     jge     end_processmove
 
+    ; if it is a valid move to make, then mark it otherwise don't
     move_add:
     mov     BYTE[markarr+eax], "+"
     end_processmove:
@@ -768,6 +780,8 @@ processmove:
 processrook:
     push    ebp
     mov     ebp, esp
+
+    ; calculates 4 different lines (up, down, left, and right)
 
     push    -1
     push    0
@@ -800,6 +814,7 @@ processpawn:
 
     sub     esp, 8
 
+    ; stores the pawn's target end row, either row 0 or 7
     mov     al, BYTE[playerTurn]
     xor     eax, 1 
     mov     ebx, 7
@@ -809,6 +824,7 @@ processpawn:
     mov     DWORD[ebp-8], ebx
     xor     eax, 1
 
+    ; puts into ebp-4 either 1 or -1, meaning which direction the pawn is to take
     mov     ebx, -1
     cmp     eax, 0
     cmove   eax, ebx    
@@ -894,6 +910,8 @@ processbishop:
     push    ebp
     mov     ebp, esp
 
+    ; process 4 move directions on all the diagonals
+
     push    -1
     push    -1
     call    processlines
@@ -925,7 +943,7 @@ processking:
 
     sub     esp, 8
 
-    ; processes the king's move square
+    ; processes the king's move square (a box)
     mov     DWORD[ebp-4], 1
     top_proc_king:
     cmp     DWORD[ebp-4], -2
@@ -945,12 +963,14 @@ processking:
         jmp     top_proc_king
     end_proc_king:
 
-    ; checks for castling
+    ; checks for castling, can't if in check
+    ; passign through check is done separately later
     xor     eax, eax
     mov     al, BYTE[playerTurn]
     cmp     BYTE[inCheck+eax], 1
     je      endCastle
 
+    ; finds offset to the castleInf bit 
     mov     ebx, eax
     xor     ebx, 1
     mov     ecx, ebx
@@ -959,6 +979,7 @@ processking:
     lea     ecx, [ecx*2]
     shr     edx, cl
 
+    ; goes to check both queen and king sides for catling openings
     test    BYTE[castleInf], dl
     jz      kingside
         cmp     BYTE[pieces+(ebx*8)+1], "-"
@@ -968,15 +989,16 @@ processking:
         cmp     BYTE[pieces+(ebx*8)+3], "-"
         jne     kingside
             mov     BYTE[markarr+(ebx*8)+2], "+" 
+
     kingside:
-        shr     edx, 1
-        test    BYTE[castleInf], dl
-        jz      endCastle
-            cmp     BYTE[pieces+(ebx*8)+5], "-"
-            jne     endCastle
-            cmp     BYTE[pieces+(ebx*8)+6], "-"
-            jne     endCastle
-                mov     BYTE[markarr+(ebx*8)+6], "+"
+    shr     edx, 1
+    test    BYTE[castleInf], dl
+    jz      endCastle
+        cmp     BYTE[pieces+(ebx*8)+5], "-"
+        jne     endCastle
+        cmp     BYTE[pieces+(ebx*8)+6], "-"
+        jne     endCastle
+            mov     BYTE[markarr+(ebx*8)+6], "+"
     endCastle:
 
     mov     esp, ebp
@@ -992,7 +1014,7 @@ convertpoint:
     mov     eax, 0
     mov     al, BYTE[userin]
 
-    ; Check to see if valid
+    ; Check to see if is a valid letter, stored in xpos
     mov     ebx, eax
     sub     ebx, 97
     cmp     ebx, 0
@@ -1001,10 +1023,12 @@ convertpoint:
     jg      failconvert
         mov     DWORD[xpos], ebx
 
+    ; second number entered is moved into al
     mov     al, BYTE[userin+1]
     mov     ebx, eax
     sub     ebx, 49
 
+    ; checks if that is a valid number, stores in ypos
     cmp     ebx, 0
     jl      failconvert
     cmp     ebx, 7
@@ -1013,20 +1037,15 @@ convertpoint:
         sub     ecx, ebx
         mov     DWORD[ypos], ecx
 
+    ; calculates the square to see if that is a valid square
     push    0
     push    0
     push    DWORD[ypos]
     push    DWORD[xpos]
     call    calc_square
     add     esp, 16
-
-    cmp     eax, 0x420
-    je      failconvert
-
-    mov     bl, BYTE[pieces+eax]
-    mov     BYTE[select], bl
-    
     jmp     endconvert
+
     failconvert:
     mov     eax, 0x420
     endconvert:
@@ -1040,8 +1059,11 @@ calcnumbmoves:
     push    ebp
     mov     ebp, esp
 
-    mov     ecx, 0
-    mov     eax, 0
+    ; loops through the markarr to determine if any possible moves
+    ; stores 0x69 as the error flag if that't the case    
+    xor     eax, eax
+    xor     ecx, ecx
+
     top_calcloop:
     cmp     ecx, 64
     jge     end_calcloop
@@ -1053,10 +1075,10 @@ calcnumbmoves:
     jmp     top_calcloop
     end_calcloop:
 
+    mov     ecx, 0x69
     cmp     eax, 0
-    jne     endcalc0
-        mov     DWORD[errorflag], 0x69
-    endcalc0:
+    cmovne  eax, ecx
+    mov     DWORD[errorflag], eax
 
     mov     esp, ebp
     pop     ebp
