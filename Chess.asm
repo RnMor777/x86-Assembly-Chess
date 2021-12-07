@@ -1,50 +1,52 @@
 %define BOARD_FILE 'media/board.txt'
 %define INTRO_FILE 'media/intro.txt'
 %define STRUC_FILE 'media/instructions.txt'
-%define SAVE_FILE  'saves/saves.txt'
 %define FEN_FILE   'saves/saves.fen'
 %define INIT_FILE  'media/.init'
 %define HEIGHT     15
-%define WIDTH      72 
+%define WIDTH      73
 %define TOPVERT    4  
 %define TOPHORZ    20
 %define ENDVERT    12
 %define ENDHORZ    36 
 %define ENDHORZ2   37
-%define TURNLOC    94
 
 segment .data
     board_file          db  BOARD_FILE, 0
     intro_file          db  INTRO_FILE, 0
     struc_file          db  STRUC_FILE, 0
-    save_file           db  SAVE_FILE, 0
     init_file           db  INIT_FILE, 0
     fen_file            db  FEN_FILE, 0
     mode_r              db  "r", 0
     mode_w              db  "w", 0
     raw_mode_on_cmd     db  "stty raw -echo", 0
     raw_mode_off_cmd    db  "stty -raw echo", 0
+    initSys             db  "stty -echo -icanon", 0 
+    initMouse      db  "echo '",0x1b,"[?1003h",0x1b,"[?1015h",0x1b,"[?1006h'",0x1b,"[?25l",0
+    resSys              db  "stty echo icanon", 0 
+    resMouse       db  "echo '",0x1b,"[?1003l",0x1b,"[?1015l",0x1b,"[?1006l'",0x1b,"[?25h",0
     clear_screen_cmd    db  "clear", 0
-    color_normal        db  0x1b, "[0m", 0
+    color_normal        db  0x1b, "[0;24m", 0
     color_square1       db  0x1b, "[104m", 0, 0
     color_square2       db  0x1b, "[44m", 0, 0, 0
     color_edge          db  0x1b, "[100m", 0, 0
     color_move          db  0x1b, "[42m", 0
-    color_black         db  0x1b, "[30m", 0, 0, 0
-    color_white         db  0x1b, "[97m", 0
+    color_white         db  0x1b, "[97m", 0, 0, 0
+    color_black         db  0x1b, "[30m", 0
+    color_hover         db  0x1b, "[44;4m", 0
 
-    BPAWN               dw  __utf32__("♟"), 0, 0
-    BROOK               dw  __utf32__("♜"), 0, 0
-    BKNIGHT             dw  __utf32__("♞"), 0, 0
-    BBISH               dw  __utf32__("♝"), 0, 0
-    BQUEEN              dw  __utf32__("♛"), 0, 0
-    BKING               dw  __utf32__("♚"), 0, 0
     WPAWN               dw  __utf32__("♙"), 0, 0
     WROOK               dw  __utf32__("♖"), 0, 0
     WKNIGHT             dw  __utf32__("♘"), 0, 0
     WBISH               dw  __utf32__("♗"), 0, 0
     WQUEEN              dw  __utf32__("♕"), 0, 0
     WKING               dw  __utf32__("♔"), 0, 0
+    BPAWN               dw  __utf32__("♟"), 0, 0
+    BROOK               dw  __utf32__("♜"), 0, 0
+    BKNIGHT             dw  __utf32__("♞"), 0, 0
+    BBISH               dw  __utf32__("♝"), 0, 0
+    BQUEEN              dw  __utf32__("♛"), 0, 0
+    BKING               dw  __utf32__("♚"), 0, 0
     VERT                dw  __utf32__("│"), 0, 0
     HORIZ               dw  __utf32__("─"), 0, 0
     CORNUL              dw  __utf32__("┌"), 0, 0
@@ -58,27 +60,28 @@ segment .data
     frmt_reg            db  "%s", 0
     newline             db  10, 0
     frmt_locale         db  "", 0
-    frmt_scan           db  "%c%d", 0
+    frmt_delim          db  ";", 0
+    frmt_Mm             db  "Mm", 0
     frmt_space          db  " ", 0
     frmt_spacesave      db  "%36s", 0
     frmt_spacecheck     db  "%42s", 0
     frmt_spacemate      db  "%46s", 0
-    frmt_moves          db  "%.8s", 0
-    frmt_moves2         db  "%.6s", 0
+    frmt_pgn            db  " %s", 0
+    frmt_int            db  "%2d", 0
     frmt_print          db  "Enter a move: ", 0
     frmt_print2         db  "Enter a destination: ", 0
-    frmt_bcheck         db  "Black in Check", 10, 13, 0
-    frmt_wcheck         db  "White in Check", 10, 13, 0
+    frmt_bcheck         db  "White in Check", 10, 13, 0
+    frmt_wcheck         db  "Black in Check", 10, 13, 0
     frmt_turn           db  "WhiteBlack"
     frmt_saved          db  "Saved",0
     frmt_mate           db  "Checkmate - Game Over!", 10, 13, 0
     frmt_again          db  "Play again? (y/n): ", 0
     frmt_capture1       db  " Captured by white: ", 0
     frmt_capture2       db  " Captured by black: ", 0
-    frmt_promote        db  "Enter a promotion Bishop(b), Rook(r), Knight(h), or Queen (q): ", 0
+    frmt_promote        db  "Enter a promotion Bishop(b), Rook(r), Knight(n), or Queen (q): ", 0
     frmt_intro          db  "Enter an option: ", 0
-    frmt_cont           db  "---- Press any key to continue ----", 0
-    memjumparr          db  3,0,0,0,0,0,2,0,0,5,0,0,0,0,0,4,1
+    frmt_cont           db  "---- Right Click or z to continue ----", 0
+    memjumparr          db  3,0,0,0,0,0,0,0,0,5,0,0,2,0,0,4,1
     knightarr           dd  -1,-2,1,-2,2,-1,2,1,-1,2,1,2,-2,1,-2,-1
 
 segment .bss
@@ -93,29 +96,19 @@ segment .bss
     select      resb    1
     selectFlag  resb    1
     errorflag   resd    1
-    prevChar    resb    1
-    currChar    resb    1
     xyposCur    resd    1
-    xyposLast1  resd    1
-    xyposLast2  resd    1
-    captureW    resb    5
+    round       resd    1
+    sStruct     resd    1
     captureB    resb    5
+    captureW    resb    5
     playerTurn  resb    1
-    canCastleW  resb    2
-    canCastleB  resb    2
-    prevCastle  resb    4
-    wasCastle   resb    1
     inCheck     resb    2
     fen         resb    90
-    round       resd    1
     inGame      resb    1
-    pgn         resb    1600 
-    moves       resb    4
     didMove     resb    1
-    wasProm     resb    1
-    wasPas      resb    1
-    prevEnPas   resw    1
-    enPasTar    resw    1
+    castleInf   resb    1
+    enPasTarget resb    1
+    halfMove    resb    1
 
 segment .text
 	global  main
@@ -127,9 +120,15 @@ segment .text
     extern  fopen
     extern  fread
     extern  fwrite
-    extern  fgetc
     extern  fclose
+    extern  fgetc
     extern  setlocale
+    extern  malloc
+    extern  free
+    extern  strtok
+    extern  atoi
+    extern  fcntl
+    extern  usleep
 
 ; main()
 main:
@@ -138,111 +137,93 @@ main:
 	; ********** CODE STARTS HERE **********
 
     ; scans in all of the files, sets up unicode, and defaults
+    ; prepares the terminal for mouse input
+    ; creates the doubly linked list which holds all previous moves
     call    init_intro    	
     push    frmt_locale
     push    0x6
     call    setlocale
     add     esp, 8
     call    seed_start
+    push    initSys
+    call    system
+    add     esp, 4
+    push    initMouse
+    call    system
+    add     esp, 4
 
-    ; runs the initial start screen
+    ; runs the initial start screen and takes in clicks or keyboard
+    ; input to do the selected menu item
     start_intro:
     push    introboard 
     call    render_intro
     add     esp, 4
 
-    push    frmt_intro
-    call    printf
-    add     esp, 4
-    
-    push    userin
-    push    frmt_reg
-    call    scanf
-    add     esp, 8
+    call    getUserIn2
 
-    mov     ebx, 0
-    mov     bl, BYTE[userin]
-    cmp     bl, '1'
+    cmp     BYTE[userin], 5
     je      game_loop
-    cmp     bl, '2'
+    cmp     BYTE[userin], 'p'
+    je      game_loop
+    cmp     BYTE[userin], 6
     je      struc_loop
-    cmp     bl, '3'
-    je      game_load      
-    cmp     bl, '4'
+    cmp     BYTE[userin], 'i'
+    je      struc_loop
+    cmp     BYTE[userin], 8
+    je      again_loop_end
+    cmp     BYTE[userin], "q"
     je      again_loop_end
     jmp     start_intro
 
-    ; loads a saved game
-    game_load:
-        call    save_intro
-        jmp     game_bottom
-
-    ; runs the instruction screen
+    ; runs the instruction screen and waits until q or click to move on
     struc_loop:
+    mov     BYTE[userin], 0
     push    strucboard
     call    render_intro
     add     esp, 4
-
     push    frmt_cont
     call    printf
     add     esp, 4
-
-    push    raw_mode_on_cmd
-    call    system
-    add     esp, 4
-
-    call    getchar
-    call    getchar
-
-    push    raw_mode_off_cmd
-    call    system
-    add     esp, 4
-    
+    topStructWait: 
+    call    getUserIn
+    cmp     BYTE[userin], 'z'
+    jne     topStructWait
     cmp     BYTE[inGame], 1
     je      game_loop
     jmp     start_intro
 
-    ; actual game start
+    ; This is where the main game actually starts
     game_loop:
+        ; sets gameStatus and waits on the user to do something
         mov     BYTE[inGame], 1
         mov     BYTE[didMove], 0
         call    render
         call    clearmoves
-
-        push    frmt_print
-        call    printf
-        add     esp, 4
-   
-        push    userin
-        push    frmt_reg
-        call    scanf
-        add     esp, 8
+        call    getUserIn
     
-        ; Exit function by entering an x
+        ; If the user pressed q then quits
         mov     al, BYTE[userin]
-        cmp     al, 'x'
+        cmp     al, 'q'
         je      again_loop_end
 
-        ; Loads Instruction page
-        cmp     al, '?'
+        ; If the user press i then loads Instruction page
+        cmp     al, 'i'
         je      struc_loop
 
-        ; Saves the game
+        ; If the user press s then saves the game state
         cmp     al, 's'
         jne      save_func2
             mov     DWORD[errorflag], 0x777
-            call    save_current
             call    save_fen
             jmp     game_bottom
         save_func2:
 
-        ; runs an undo function for the last move
+        ; If the user pressed u then runs an undo function for the last move
         cmp     al, 'u'
         jne     end_undo
-        cmp     DWORD[xyposLast1], -1
-        je      end_undo
-            call    undo_func 
-            jmp     game_bottom
+            push    DWORD[sStruct]
+            call    popBack
+            add     esp, 4
         end_undo:
 
         ; Converts the entered points into integer values in the array
@@ -251,317 +232,78 @@ main:
         cmp     eax, 0x420
         je      game_bottom
 
+        ; stores the location of the piece that the user input, if the piece
+        ; was just a blank spot then skips, otherwise if processes the turn for the
+        ; input piece and sieves off any moves that result in check
         mov     DWORD[xyposCur], eax
         xor     ebx, ebx
         mov     bl, BYTE[pieces+eax]
-    
         cmp     bl, "-"
         je      game_bottom
             push    ebx
             call    procTurns
             add     esp, 4
-        game_next:
-
         call    sieve_check
         call    sieve_castle
-
-        ; Calculates the number of moves for the selected piece
         call    calcnumbmoves
         cmp     eax, 0
         je      game_bottom
 
-        ; Re-renders showing highlighted move spaces
-        call    render
-
-        push    frmt_print2
-        call    printf
-        add     esp, 4
-
-        mov     ax, WORD[userin]
-        mov     WORD[moves], ax 
-
         ; STEP 2: Get the destination square
-        push    userin
-        push    frmt_reg
-        call    scanf
-        add     esp, 8
+        game_next:
+        call    render
+        call    getUserIn
 
-        ; Just clears the board
+        ; If the user pressed z then exit out of the piece selection
         cmp     BYTE[userin], 'z'
         je      game_bottom
 
-        ; Converts the entered points into integer values in the array
+        ; Convert to integer values and then does the moving/loading
+        ; pushBack is used to handle all the moving and saving the move in a node
         call    convertpoint
         cmp     eax, 0x420
         je      game_next
-
-        mov     dx, WORD[userin]
-        mov     WORD[moves+2], dx
-
-        mov     ecx, eax
         mov     bl, BYTE[markarr+eax]
-        mov     eax, DWORD[xyposCur]
-
-        ; Does the moving of the pieces
         cmp     bl, "+"
         jne     game_next
-            ; dl is the current moving piece
-            ; bl is the character being overwritten
-            xor     edx, edx
-            mov     BYTE[wasProm], 0
-            mov     BYTE[wasPas], 0
-            mov     dl, BYTE[pieces+eax] 
-            mov     bl, BYTE[pieces+ecx]
-            mov     BYTE[pieces+ecx], dl
-            mov     BYTE[pieces+eax], "-"
-
-            mov     DWORD[xyposLast1], eax
-            mov     DWORD[xyposLast2], ecx
-            mov     BYTE[prevChar], bl
-            mov     BYTE[currChar], dl
-            mov     BYTE[didMove], 1
-
-            ; Changes the player turn marker
-            xor     BYTE[playerTurn], 1
-
-            ; Stores current castle info 
-            mov     esi, DWORD[canCastleW]
-            mov     DWORD[prevCastle], esi
-
-            ; Changes castling information on piece movement
-            cmp     dl, "k"
-            jne     next_castle
-                mov     WORD[canCastleW], 0
-            next_castle:
-            cmp     dl, "K"
-            jne     next_castle2
-                mov     WORD[canCastleB], 0
-            next_castle2:
-            cmp     BYTE[pieces], "R"
-            je      next_castle3
-                mov     BYTE[canCastleB], 0
-            next_castle3:
-            cmp     BYTE[pieces+7], "R"
-            je      next_castle4
-                mov     BYTE[canCastleB+1], 0
-            next_castle4:
-            cmp     BYTE[pieces+56], "r"
-            je      next_castle5
-                mov     BYTE[canCastleW], 0
-            next_castle5:
-            cmp     BYTE[pieces+63], "r"
-            je      next_castle6
-                mov     BYTE[canCastleW+1], 0
-            next_castle6:
-
-            ; Does the castling
-            mov     BYTE[wasCastle], 0
-            cmp     dl, "K"
-            je      castle_move
-            cmp     dl, "k"
-            je      castle_move
-            jmp     end_castle_func
-    
-            castle_move:
-            mov     esi, ecx
-            sub     esi, eax
-            sub     dl, "K"
-            mov     al, dl
-            xor     al, 32
-            mov     cl, "r"
-            sub     cl, al
-            shr     al, 4
-            shr     dl, 5
-            xor     al, 2
-            imul    edx, 56
-                cmp     esi, -2
-                je      castle_queen
-                cmp     esi, 2
-                je      castle_king
-                jmp     end_castle_func
-            
-                castle_queen:
-                mov     BYTE[pieces+edx], "-"
-                mov     BYTE[pieces+edx+3], cl
-                mov     BYTE[wasCastle], 1
-                add     BYTE[wasCastle], al
-                jmp     end_castle_func
-
-                castle_king:
-                mov     BYTE[pieces+edx+5], cl
-                mov     BYTE[pieces+edx+7], "-"
-                mov     BYTE[wasCastle], 2
-                add     BYTE[wasCastle], al
-                jmp     end_castle_func
-            end_castle_func:
-
-            ; Keeps track of captured pieces
-            push    1
-            push    ebx
-            call    fill_capture
-            add     esp, 8
-
-            ; Does the enpassant capture
-            mov     eax, 1
-            xor     ebx, ebx
-            mov     cl, BYTE[currChar]
-            cmp     cl, "P"
-            cmove   eax, ebx
-            cmp     cl, "p"
-            cmove   eax, ebx
-            cmp     eax, 0
-            jne     passant_move 
-             
-            mov     bx, WORD[moves+2]
-            cmp     bx, WORD[enPasTar]
-            jne     passant_move
-                mov     BYTE[wasPas], 1
-                mov     eax, "5"
-                mov     ebx, "4"
-                cmp     BYTE[enPasTar+1], "3"  
-                cmove   eax, ebx
-                sub     eax, 48 
-                mov     ebx, 8
-                sub     ebx, eax
-                shl     ebx, 3
-                mov     al, BYTE[enPasTar]
-                sub     eax, 97
-                add     ebx, eax
-                xor     eax, eax
-                mov     al, BYTE[pieces+ebx]
-                mov     BYTE[pieces+ebx], '-'
-                push    1
-                push    eax 
-                call    fill_capture
-                add     esp, 8
-            passant_move:
-            mov     bx, WORD[enPasTar]
-            mov     WORD[prevEnPas], bx
-            mov     WORD[enPasTar], 0
-
-            ; Promote Pawn
-            cmp     BYTE[currChar], "P"
-            je      start_prom
-            cmp     BYTE[currChar], "p"
-            je      start_prom
-            jmp     end_prom_pawn
-            start_prom:
-            mov     eax, DWORD[xyposLast2]
-            mov     ebx, 56
-            cdq
-            div     ebx
-            cmp     edx, 8
-            jge     end_prom_pawn
-
-            prom_pawn:
-                call    render
-
-                push    frmt_promote
-                call    printf
-                add     esp, 4
-           
-                push    userin
-                push    frmt_reg
-                call    scanf
-                add     esp, 8
-                
-                mov     bl, BYTE[userin]
-                cmp     bl, "r"
-                je      do_prom
-                cmp     bl, "h"
-                je      do_prom
-                cmp     bl, "q"
-                je      do_prom
-                cmp     bl, "b"
-                je      do_prom
-                jmp     prom_pawn
-
-                do_prom:
-                mov     eax, DWORD[xyposLast2]
-                mov     ecx, eax
-                and     ecx, 32
-                sub     bl, cl
-                mov     BYTE[pieces+eax], bl
-                mov     BYTE[wasProm], 1
-            end_prom_pawn:
-
-            ; Enters enpassant target
-            cmp     BYTE[currChar], 'P'
-            je      try_enpas
-            cmp     BYTE[currChar], 'p'
-            je      try_enpas
-            jmp     no_enpas
-            try_enpas:
-                mov     al, BYTE[moves+1]    
-                mov     bl, BYTE[moves+3]    
-                mov     dl, al
-                add     dl, bl
-                shr     dl, 1
-                sub     al, bl
-                mov     ecx, eax
-                neg     al
-                cmovl   eax, ecx 
-                cmp     al, 2
-                jne     no_enpas
-                    mov     al, BYTE[moves]
-                    mov     BYTE[enPasTar], al
-                    mov     BYTE[enPasTar+1], dl
-            no_enpas:
-
+            push    eax
+            push    DWORD[xyposCur]
+            push    DWORD[sStruct]
+            call    pushBack
+            add     esp, 12
         game_bottom:
-        ; Calc Check Function
-        push    0
-        call    bwcalc_check
-        add     esp, 4
 
-        ; calls function to calculate check
-        push    32
-        call    bwcalc_check
-        add     esp, 4
-
-        ; checks if checkmate
-        cmp     BYTE[inCheck], 0
-        je      skip_mate
-            push    0 
-            call    procCheckmate
-            add     esp, 4
-        skip_mate:
-        cmp     BYTE[inCheck+1], 0
-        je      skip_mate2
-            push    32
-            call    procCheckmate
-            add     esp, 4
-        skip_mate2:
-
-        ; logs the moves to the screen
+        ; cleans up the move array and checks for checkmate
         call    clearmoves
-        cmp     BYTE[didMove], 0
-        je      nolog
-            call    log_moves 
-        nolog:
-
         cmp     DWORD[errorflag], 0xAA
-        je      game_loop_end
+        je      again_loop
         jmp     game_loop
-    game_loop_end:
+
+    ; when checkmate occurs, the user is prompted to play again or not
     again_loop:
-        call    render
-        push    frmt_again
-        call    printf
-        add     esp, 4
-        push    userin
-        push    frmt_reg
-        call    scanf
-        add     esp, 8
+    call    render
+    push    frmt_again
+    call    printf
+    add     esp, 4
+    call    getUserIn
     cmp     BYTE[userin], "y"
     je      start_game
     cmp     BYTE[userin], "n"
     je      again_loop_end
     jmp     again_loop
     start_game:
-        call    seed_start
-        jmp     game_loop
+    call    seed_start
+    jmp     game_loop
+
+    ; when ever the game is exited or quit, runs these function to clean up the bash
+    ; shell and restore normal defaults
     again_loop_end:
+    push    resSys
+    call    system
+    add     esp, 4
+    push    resMouse
+    call    system
+    add     esp, 4
 
 	; *********** CODE ENDS HERE ***********
     popa
@@ -574,14 +316,14 @@ seed_start:
     push    ebp
     mov     ebp, esp
 
+    ; opens the file called init in the media folder
+    ; this is used to scan in the starting positions into the pieces array
     lea     esi, [init_file]
     lea     edi, [pieces]
-
     push    mode_r
     push    esi
     call    fopen
     add     esp, 8
-
     push    eax
     push    64
     push    1
@@ -589,23 +331,21 @@ seed_start:
     call    fread
     add     esp, 16
 
+    ; initializes all the variables necessary to their starting values
+    call    clearmoves
+    call    makestack
+    mov     DWORD[sStruct], eax
     mov     BYTE[playerTurn], 0
-    mov     DWORD[xyposLast1], -1
     mov     WORD[inCheck], 0
     mov     DWORD[captureW], 0
     mov     BYTE[captureW+4], 0
     mov     DWORD[captureB], 0
     mov     BYTE[captureB+4], 0
-    mov     DWORD[canCastleW], 0x01010101
-    mov     BYTE[wasCastle], 0
     mov     DWORD[errorflag], 0 
     mov     DWORD[round], 1
     mov     BYTE[inGame], 0
-    mov     WORD[wasProm], 0
-    mov     WORD[enPasTar], 0
-
-    call    clearmoves
-    call    clearpgn
+    mov     BYTE[castleInf], 15
+    mov     BYTE[halfMove], 0
 
     mov     esp, ebp
     pop     ebp
@@ -616,21 +356,25 @@ render:
     push    ebp
     mov     ebp, esp
 
+    ; clears the command line screen so nothing is left on it
     sub     esp, 12
     push    clear_screen_cmd
     call    system
     add     esp, 4
 
-    ; prints the turn marker
+    ; prints the turn marker by finding the word black or white in frmt_turn and
+    ; overwritting the position on the board to be that new word
     xor     eax, eax
     mov     ebx, 5
     mov     al, BYTE[playerTurn]
     mul     ebx
     mov     ebx, DWORD[frmt_turn+eax]
-    mov     DWORD[board+94], ebx
+    mov     DWORD[board+95], ebx
     mov     bl, BYTE[frmt_turn+eax+4]
-    mov     BYTE[board+98], bl 
+    mov     BYTE[board+99], bl 
+    xor     ecx, ecx
 
+    ; goes into a double for loop that traverses the entire board array while printing it
     mov     DWORD[ebp-4], 0
     y_loop_start:
     cmp     DWORD[ebp-4], HEIGHT
@@ -686,7 +430,7 @@ render:
                 add     ecx, edx
                 mov     DWORD[ebp-12], ecx
 
-                ; sets the color is the square is to be highlighted
+                ; sets the color if the square is to be highlighted
                 cmp     BYTE[markarr+ecx], "+"
                 jne     selectedcolorend
                     push    color_move
@@ -702,8 +446,8 @@ render:
                 cmp     al, "-"
                 je      endprintboard
 
-                ; this converts the character to 14, 16, 6, 0, 15, 9
-                ; points to an array which redirects to the proper memory address
+                ; this converts the character to a number and then points
+                ; to an array which redirects to the proper memory address
                 sub     al, 66
                 mov     ebx, 32
                 cdq
@@ -714,12 +458,12 @@ render:
                 shl     eax, 1
                 sub     ecx, eax
                 add     ebx, ecx
-                lea     ebx, [BPAWN+ebx*8]
+                lea     ebx, [WPAWN+ebx*8]
 
                 ; prints either the char in black or white
                 mov     DWORD[ebp-12], ebx
                 shr     ecx, 2
-                lea     ebx, [color_black+ecx*8]
+                lea     ebx, [color_white+ecx*8]
                 push    ebx
                 call    printf
                 add     esp, 4
@@ -757,15 +501,17 @@ render:
             jl      to_color     
                 sub     DWORD[ebp-12], 8 
                 jmp     colorless
+
+            ; this prints the color of the edge and the character to white
             to_color:
             push    color_edge
             call    printf
             add     esp, 4
-
             push    color_white
             call    printf
             add     esp, 4
 
+            ; prints the unique unicode character based on an offset from VERT character
             colorless:
             mov     ebx, DWORD[ebp-12]
             sub     ebx, 77
@@ -778,91 +524,40 @@ render:
             endspecial:
 
             ; prints the log of previous moves
-            ; Does scrolling too
             cmp     bl, "w"
             jne     endtrack
-                mov     bl, ' '
-                mov     eax, DWORD[ebp-4]
-                sub     eax, 3
-                mov     ecx, DWORD[round] 
-                cmp     ecx, 10
-                jle     noscroll
-                    add     eax, DWORD[round]
-                    sub     eax, 10
-                    dec     ecx
-                    shl     ecx, 4
-                    cmp     BYTE[pgn+ecx+1], 48
-                    jge     noscroll
-                        dec     eax
-                noscroll:
-                mov     ecx, eax
-                shl     ecx, 4
-                mov     DWORD[ebp-12], ecx
-                cmp     BYTE[pgn+ecx+1], 48
-                jl      endtrack
-                    lea     edx, [pgn+ecx]
-                    push    edx
-                    push    frmt_moves
-                    call    printf
-                    add     esp, 8
-                    add     DWORD[ebp-8], 7
-                mov     ecx, DWORD[ebp-12]
-                cmp     BYTE[pgn+ecx+9], '|'
-                jne     endtrack_in
-                    xor     edx, edx
-                    mov     dl, BYTE[pgn+ecx+8]
-                    push    edx
-                    call    putchar
-                    add     esp, 4
-
-                    push    VERT
-                    push    frmt_unic
-                    call    printf
-                    add     esp, 8
-
-                    mov     ecx, DWORD[ebp-12]
-                    lea     edx, [pgn+ecx+10]
-                    push    edx
-                    push    frmt_moves2
-                    call    printf
-                    add     esp, 8
-                    add     DWORD[ebp-8], 8
-                    jmp     piece_end
-            endtrack_in:
-                cmp     BYTE[pgn+ecx+8], "+"
-                jne     piece_end
-                    xor     edx, edx
-                    mov     dl, BYTE[pgn+ecx+8]
-                    push    edx
-                    call    putchar
-                    add     esp, 4
-                    add     DWORD[ebp-8], 1
-                    jmp     piece_end
+                mov     ebx, DWORD[ebp-4]
+                sub     ebx, 3
+                push    ebx
+                call    printPGN
+                add     esp, 4
+                add     DWORD[ebp-8], eax
+                jmp     x_loop_start
             endtrack:
             
-            ; Default regular character
-            push    ebx     
-            call    putchar
-            add     esp, 4
+        ; Default regular character
+        push    ebx     
+        call    putchar
+        add     esp, 4
 
-            piece_end:
-            push    color_normal
-            call    printf
-            add     esp, 4
+        ; resets the color to normal
+        piece_end:
+        push    color_normal
+        call    printf
+        add     esp, 4
         inc     DWORD[ebp-8]
         jmp     x_loop_start
 
-        x_loop_end:
-        push    0x0d
-        call    putchar
-        add     esp, 4
-        push    0x0a
-        call    putchar
-        add     esp, 4
+    ; when the x position is done, print a newline
+    x_loop_end:
+    push    0x0a
+    call    putchar
+    add     esp, 4
     inc     DWORD[ebp-4]
     jmp     y_loop_start
     y_loop_end:
 
+    ; prints special messages after words like: checkmate, in check, saved
     cmp     DWORD[errorflag], 0xAA
     jne     err_next
         push    frmt_mate
@@ -894,6 +589,7 @@ render:
         mov     DWORD[errorflag], 0
     err_next3:
 
+    ; prints all the captured pieces by calling a print captured function
     push    newline
     call    printf
     add     esp, 4
@@ -906,114 +602,12 @@ render:
     pop     ebp
     ret
 
-; void undo_func()
-undo_func:
-    push    ebp
-    mov     ebp, esp
-
-    cmp     BYTE[wasCastle], 1
-    je      undocastle1
-    cmp     BYTE[wasCastle], 2
-    je      undocastle2
-    cmp     BYTE[wasCastle], 3
-    je      undocastle3
-    cmp     BYTE[wasCastle], 4
-    je      undocastle4
-    jmp     botundocastle
-        undocastle1:
-        mov     BYTE[pieces], "R"
-        mov     BYTE[pieces+4], "K"
-        mov     BYTE[pieces+2], "-"
-        mov     BYTE[pieces+3], "-"
-        jmp     botundocastle
-        undocastle2:
-        mov     BYTE[pieces+7], "R"
-        mov     BYTE[pieces+4], "K"
-        mov     BYTE[pieces+5], "-"
-        mov     BYTE[pieces+6], "-"
-        jmp     botundocastle
-        undocastle3:
-        mov     BYTE[pieces+56], "r"
-        mov     BYTE[pieces+60], "k"
-        mov     BYTE[pieces+58], "-"
-        mov     BYTE[pieces+59], "-"
-        jmp     botundocastle
-        undocastle4:
-        mov     BYTE[pieces+63], "r"
-        mov     BYTE[pieces+60], "k"
-        mov     BYTE[pieces+61], "-"
-        mov     BYTE[pieces+62], "-"
-
-        botundocastle:
-        mov     ebx, DWORD[prevCastle]
-        mov     DWORD[canCastleW], ebx
-        endundocastle:
-
-        mov     edx, 0
-        mov     ebx, DWORD[xyposLast1]
-        mov     ecx, DWORD[xyposLast2]
-        mov     dl, BYTE[currChar]
-        mov     BYTE[pieces+ebx], dl
-        mov     dl, BYTE[prevChar]
-        mov     BYTE[pieces+ecx], dl
-        mov     DWORD[xyposLast1], -1
-        xor     BYTE[playerTurn], 1
-
-        mov     eax, DWORD[round]
-        dec     eax
-        shl     eax, 4
-        cmp     BYTE[playerTurn], 1
-        je      undoBlack
-            mov     DWORD[pgn+eax], 0
-            mov     DWORD[pgn+eax+4], 0
-            jmp     undocap
-        undoBlack:
-            mov     DWORD[pgn+eax-7], 0
-            mov     WORD[pgn+eax-3], 0
-            mov     BYTE[pgn+eax-1], 0
-            dec     DWORD[round]
-        undocap:
-
-        mov     WORD[enPasTar], 0
-        cmp     BYTE[wasPas], 1
-        jne     endUndoPas
-            mov     eax, "5"
-            mov     ebx, "4"
-            cmp     BYTE[prevEnPas+1], "3"  
-            cmove   eax, ebx
-            sub     eax, 48 
-            mov     ebx, 8
-            sub     ebx, eax
-            shl     ebx, 3
-            mov     al, BYTE[prevEnPas]
-            sub     eax, 97
-            add     ebx, eax
-            mov     eax, "P"
-            mov     ecx, "p"
-            cmp     BYTE[playerTurn], 1
-            cmove   eax, ecx
-            mov     BYTE[pieces+ebx], al
-            mov     edx, eax
-            mov     BYTE[wasPas], 0
-            mov     bx, WORD[prevEnPas]
-            mov     WORD[enPasTar], bx
-        endUndoPas:
-
-        push    -1
-        push    edx
-        call    fill_capture
-        add     esp, 8 
-
-    mov     esp, ebp
-    pop     ebp
-    ret
 ; int calc_square (pos x, pos y, offset x, offset y)
 calc_square:
     push    ebp
     mov     ebp, esp    
 
     sub     esp, 4
-
     mov     eax, DWORD[ebp+12]
     add     eax, DWORD[ebp+20]
 
@@ -1023,10 +617,10 @@ calc_square:
     cmp     eax, 7
     jg      errSquare    
 
-    shl     eax, 3
-    mov     DWORD[ebp-4], eax
-    mov     eax, DWORD[ebp+8]
-    add     eax, DWORD[ebp+16]
+        shl     eax, 3
+        mov     DWORD[ebp-4], eax
+        mov     eax, DWORD[ebp+8]
+        add     eax, DWORD[ebp+16]
     
     ; Makes sure the move is within the x bounds
     cmp     eax, 0
@@ -1034,9 +628,11 @@ calc_square:
     cmp     eax, 7
     jg      errSquare
     
-    add     eax, DWORD[ebp-4]
-    jmp     regEnd
+        ; puts into eax the value of the xy combined position, aka the array offset
+        add     eax, DWORD[ebp-4]
+        jmp     regEnd
 
+    ; returns 0x420 if the square is not valid
     errSquare:
     mov     eax, 0x420
     regEnd:
@@ -1045,13 +641,14 @@ calc_square:
     pop     ebp
     ret
 
-; void clearmoves() - clears the possible moves array
+; void clearmoves()
 clearmoves:
     push    ebp
     mov     ebp, esp
 
+    ; loops over the markarr and sets it all to 0, clearing possible moves
     mov     BYTE[selectFlag], 0x0
-    mov     ecx, 0
+    xor     ecx, ecx
     startclear:
     cmp     ecx, 64
     jge     endclear
@@ -1063,32 +660,16 @@ clearmoves:
     pop     ebp
     ret
 
-; void clearpgn()
-clearpgn:
-    push    ebp
-    mov     ebp, esp
-
-    mov     ecx, 0
-    startclearpgn:
-    cmp     ecx, 1600
-    jge     endclearpgn
-        mov     BYTE[pgn+ecx], ""
-        inc     ecx
-        jmp     startclearpgn
-    endclearpgn:
-    mov     esp, ebp
-    pop     ebp
-    ret
-
-; void processlines(increment x, increment y, opponent marker (A or a))
+; void processlines(increment x, increment y)
 processlines:
     push    ebp
     mov     ebp, esp
 
-    ; Checks the line until hits a stoping point
-    mov     ecx, 1
     mov     esi, DWORD[ebp+8]
     mov     edi, DWORD[ebp+12]
+
+    ; calculates the square (if possible) at that increment of x and y
+    ; calls calc_square to figure this out 
     topprocess:
     push    edi
     push    esi
@@ -1096,67 +677,58 @@ processlines:
     push    DWORD[xpos]
     call    calc_square
     add     esp, 16
-
-    ; calculates until square does not exist
     cmp     eax, 0x420
-    je      endprocess2
+    je      endprocesslines
 
     ; if the space is open
     cmp     BYTE[pieces+eax], "-"
     je      bottomprocess
 
-    ; jumps if its a uppercase piece being moved
-    cmp     BYTE[ebp+16], "A"
-    jne     processupper
+    ; if the space can be captured (an opponent's piece)
+    xor     ebx, ebx
+    mov     bl, BYTE[playerTurn]
+    xor     ebx, 1
+    shl     ebx, 5
+    add     ebx, "A"
+    mov     cl, BYTE[pieces+eax]
+    sub     cl, bl
+    cmp     cl, 0
+    jl      endprocesslines
+    cmp     cl, 26
+    jge     endprocesslines
 
-        ; compares with it's own pieces (lowercase)
-        cmp     BYTE[pieces+eax], "Z"
-        jg      endprocess2
-        ; if the piece is able to be captured. Then also end the function
-        cmp     BYTE[pieces+eax], "A"
-        jg      endprocess1
-
-        jmp     bottomprocess
-
-    processupper:
-    ; compares with its own pieces (uppercase)
-    cmp     BYTE[pieces+eax], "Z"
-    jl      endprocess2 
-    ; if the piece is able to be captured. Then also end the function
-    cmp     BYTE[pieces+eax], "a"
-    jg      endprocess1
+        mov     BYTE[markarr+eax], "+"
+        jmp     endprocesslines
 
     bottomprocess:
     mov     BYTE[markarr+eax], "+"
-
-    inc     ecx
     add     esi, DWORD[ebp+8]
     add     edi, DWORD[ebp+12]
     jmp     topprocess
-    endprocess1:
-    mov     BYTE[markarr+eax], "+"
-    endprocess2:
+    endprocesslines:
 
     mov     esp, ebp
     pop     ebp
     ret
 
-; void processknight (opponent marker (A or a))
+; void processknight ()
 processknight:
     push    ebp
     mov     ebp, esp
 
+    ; process the move to a possible knight square
+    ; a knight square is an L shape, so everything is held in an array
+    ; to make it easier to keep track of where to check next
     mov     ebx, 0
     top_kloop:
     cmp     ebx, 16
     jge     end_kloop
         mov     ecx, DWORD[knightarr+4*ebx]
         mov     edx, DWORD[knightarr+4*(ebx+1)]
-        push    DWORD[ebp+8]
         push    ecx
         push    edx
         call    processmove
-        add     esp, 12
+        add     esp, 8
     add     ebx, 2
     jmp     top_kloop
     end_kloop:
@@ -1165,93 +737,99 @@ processknight:
     pop     ebp
     ret
 
-; void processmove (offset x, offset y, opponent marker (A or a))
+; void processmove (offset x, offset y)
 processmove:
     push    ebp
     mov     ebp, esp
+    pusha
 
+    ; checks if it's a valid movement (lands on the board)
     push    DWORD[ebp+12]
     push    DWORD[ebp+8]
     push    DWORD[ypos]
     push    DWORD[xpos]
     call    calc_square
     add     esp, 16
-
-    ; checks if it's a valid movement
     cmp     eax, 0x420
     je      end_processmove
     cmp     BYTE[pieces+eax], "-"
     je      move_add
 
-    cmp     BYTE[ebp+16], "A"
-    jne     processmove_upper
-        cmp     BYTE[pieces+eax], "Z"
-        jg      end_processmove
-        jmp     move_add
-    processmove_upper:
-        cmp     BYTE[pieces+eax], "Z"
-        jl      end_processmove
+    ; compares with enemy pieces
+    mov     bl, BYTE[playerTurn]
+    xor     ebx, 1
+    shl     ebx, 5
+    add     ebx, "A"
+    mov     cl, BYTE[pieces+eax]
+    sub     cl, bl
+    cmp     cl, 0
+    jl      end_processmove
+    cmp     cl, 26
+    jge     end_processmove
 
+    ; if it is a valid move to make, then mark it otherwise don't
     move_add:
     mov     BYTE[markarr+eax], "+"
     end_processmove:
 
+    popa
     mov     esp, ebp
     pop     ebp
     ret
 
-; void processrook (opponent marker (A or a))
+; void processrook ()
 processrook:
     push    ebp
     mov     ebp, esp
 
-    push    DWORD[ebp+8]
+    ; calculates 4 different lines (up, down, left, and right)
+
     push    -1
     push    0
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    1
     push    0
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    0
     push    -1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    0
     push    1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
     mov     esp, ebp
     pop     ebp
     ret
 
-; void processpawn(opponent marker (A or a))
+; void processpawn ()
 processpawn:
     push    ebp
     mov     ebp, esp
 
     sub     esp, 8
 
-    ; is used to determine which way the pawn direction is going
-    ; based on the opponent letter A or a
-    mov     eax, 1
-    mov     ebx, -1
-    cmp     BYTE[ebp+8], "A"
-    cmove   eax, ebx
-    mov     DWORD[ebp-4], eax
-    mov     ebx, 1
-    mov     ecx, 6
-    cmp     eax, -1
-    cmovne  ebx, ecx
+    ; stores the pawn's target end row, either row 0 or 7
+    mov     al, BYTE[playerTurn]
+    xor     eax, 1 
+    mov     ebx, 7
+    lea     ecx, [eax*5]
+    sub     ebx, ecx
+    add     ebx, 48
     mov     DWORD[ebp-8], ebx
+    xor     eax, 1
+
+    ; puts into ebp-4 either 1 or -1, meaning which direction the pawn is to take
+    mov     ebx, -1
+    cmp     eax, 0
+    cmove   eax, ebx    
+    mov     DWORD[ebp-4], eax  
 
     ; outer lop checks -1, 0, 1 offset of x positions
     mov     ecx, -1
@@ -1276,7 +854,6 @@ processpawn:
             ; checks if moving from starting position
             mov     BYTE[markarr+eax], '+'   
             mov     ebx, DWORD[ebp-8]
-            add     ebx, 49
             cmp     BYTE[userin+1], bl
             jne     pawn_bot
 
@@ -1298,35 +875,28 @@ processpawn:
 
         ; checks diagonal move squares
         diag_moves:
-        cmp     WORD[enPasTar], 0
-        jne     diag_pas
         cmp     BYTE[markarr+eax], '-'
         je      pawn_bot
-            ; checks for capturing opponent on diagonal
-            mov     ebx, DWORD[ebp+8]
-            xor     edx, edx
-            mov     dl, BYTE[pieces+eax]
-            sub     edx, ebx
-            cmp     edx, 0
-            jl      pawn_bot
-            cmp     edx, 26
-            jge     pawn_bot
-
-            mov     BYTE[markarr+eax], '+'
-            jmp     pawn_bot
-
             ; checks for capturing enpassant on diagonal
-            diag_pas:
-            mov     ebx, '8'
-            sub     bl, BYTE[enPasTar+1]
-            shl     ebx, 3
-            mov     dl, BYTE[enPasTar]
-            sub     dl, 'a'
-            add     bl, dl
-            cmp     eax, ebx
-            jne     pawn_bot
+            cmp     BYTE[enPasTarget], al
+            jne     diag_cap
+                mov     BYTE[markarr+eax], "+"
+                jmp     pawn_bot
 
-            mov     BYTE[markarr+eax], "+"
+            ; checks for capturing opponent on diagonal
+            diag_cap:
+            xor     ebx, ebx
+            mov     bl, BYTE[playerTurn]
+            xor     ebx, 1
+            shl     ebx, 5
+            add     ebx, "A"
+            mov     dl, BYTE[pieces+eax]
+            sub     dl, bl
+            cmp     dl, 0
+            jl      pawn_bot
+            cmp     dl, 26
+            jge     pawn_bot
+                mov     BYTE[markarr+eax], '+'
     pawn_bot:
     inc     ecx
     jmp     neo_top
@@ -1336,47 +906,45 @@ processpawn:
     pop     ebp
     ret
 
-; void processbishop (opponent marker (A or a))
+; void processbishop ()
 processbishop:
     push    ebp
     mov     ebp, esp
 
-    push    DWORD[ebp+8]
-    push    -1
-    push    -1
-    call    processlines
-    add     esp, 12
+    ; process 4 move directions on all the diagonals
 
-    push    DWORD[ebp+8]
+    push    -1
+    push    -1
+    call    processlines
+    add     esp, 8
+
     push    -1
     push    1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    1
     push    -1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
-    push    DWORD[ebp+8]
     push    1
     push    1
     call    processlines
-    add     esp, 12
+    add     esp, 8
 
     mov     esp, ebp
     pop     ebp
     ret
 
-; void processking (opponent marker (A or a))
+; void processking ()
 processking:
     push    ebp
     mov     ebp, esp
 
     sub     esp, 8
 
-    ; processes the king's move square
+    ; processes the king's move square (a box)
     mov     DWORD[ebp-4], 1
     top_proc_king:
     cmp     DWORD[ebp-4], -2
@@ -1385,11 +953,10 @@ processking:
         top_inner_proc_king:
         cmp     DWORD[ebp-8], -2
         je      bot_proc_king
-            push    DWORD[ebp+8]
             push    DWORD[ebp-4]
             push    DWORD[ebp-8]
             call    processmove
-            add     esp, 12
+            add     esp, 8
             dec     DWORD[ebp-8]
             jmp     top_inner_proc_king
         bot_proc_king:
@@ -1397,16 +964,25 @@ processking:
         jmp     top_proc_king
     end_proc_king:
 
-    ; checks for castling
-    mov     eax, DWORD[ebp+8]
-    sub     eax, "A"
-    shr     eax, 5
+    ; checks for castling, can't if in check
+    ; passign through check is done separately later
+    xor     eax, eax
+    mov     al, BYTE[playerTurn]
+    cmp     BYTE[inCheck+eax], 1
+    je      endCastle
+
+    ; finds offset to the castleInf bit 
     mov     ebx, eax
     xor     ebx, 1
+    mov     ecx, ebx
     imul    ebx, 7
+    mov     edx, 8
+    lea     ecx, [ecx*2]
+    shr     edx, cl
 
-    cmp     BYTE[canCastleW+(eax*2)], 1
-    jne     kingside
+    ; goes to check both queen and king sides for catling openings
+    test    BYTE[castleInf], dl
+    jz      kingside
         cmp     BYTE[pieces+(ebx*8)+1], "-"
         jne     kingside
         cmp     BYTE[pieces+(ebx*8)+2], "-"
@@ -1414,14 +990,16 @@ processking:
         cmp     BYTE[pieces+(ebx*8)+3], "-"
         jne     kingside
             mov     BYTE[markarr+(ebx*8)+2], "+" 
+
     kingside:
-        cmp     BYTE[canCastleW+(eax*2)+1], 1
+    shr     edx, 1
+    test    BYTE[castleInf], dl
+    jz      endCastle
+        cmp     BYTE[pieces+(ebx*8)+5], "-"
         jne     endCastle
-            cmp     BYTE[pieces+(ebx*8)+5], "-"
-            jne     endCastle
-            cmp     BYTE[pieces+(ebx*8)+6], "-"
-            jne     endCastle
-                mov     BYTE[markarr+(ebx*8)+6], "+"
+        cmp     BYTE[pieces+(ebx*8)+6], "-"
+        jne     endCastle
+            mov     BYTE[markarr+(ebx*8)+6], "+"
     endCastle:
 
     mov     esp, ebp
@@ -1437,7 +1015,7 @@ convertpoint:
     mov     eax, 0
     mov     al, BYTE[userin]
 
-    ; Check to see if valid
+    ; Check to see if is a valid letter, stored in xpos
     mov     ebx, eax
     sub     ebx, 97
     cmp     ebx, 0
@@ -1446,10 +1024,12 @@ convertpoint:
     jg      failconvert
         mov     DWORD[xpos], ebx
 
+    ; second number entered is moved into al
     mov     al, BYTE[userin+1]
     mov     ebx, eax
     sub     ebx, 49
 
+    ; checks if that is a valid number, stores in ypos
     cmp     ebx, 0
     jl      failconvert
     cmp     ebx, 7
@@ -1458,20 +1038,15 @@ convertpoint:
         sub     ecx, ebx
         mov     DWORD[ypos], ecx
 
+    ; calculates the square to see if that is a valid square
     push    0
     push    0
     push    DWORD[ypos]
     push    DWORD[xpos]
     call    calc_square
     add     esp, 16
-
-    cmp     eax, 0x420
-    je      failconvert
-
-    mov     bl, BYTE[pieces+eax]
-    mov     BYTE[select], bl
-    
     jmp     endconvert
+
     failconvert:
     mov     eax, 0x420
     endconvert:
@@ -1485,8 +1060,11 @@ calcnumbmoves:
     push    ebp
     mov     ebp, esp
 
-    mov     ecx, 0
-    mov     eax, 0
+    ; loops through the markarr to determine if any possible moves
+    ; stores 0x69 as the error flag if that't the case    
+    xor     eax, eax
+    xor     ecx, ecx
+
     top_calcloop:
     cmp     ecx, 64
     jge     end_calcloop
@@ -1498,10 +1076,10 @@ calcnumbmoves:
     jmp     top_calcloop
     end_calcloop:
 
+    mov     ecx, 0x69
     cmp     eax, 0
-    jne     endcalc0
-        mov     DWORD[errorflag], 0x69
-    endcalc0:
+    cmovne  eax, ecx
+    mov     DWORD[errorflag], eax
 
     mov     esp, ebp
     pop     ebp
@@ -1590,6 +1168,7 @@ func_print_captured:
 fill_capture:
     push    ebp
     mov     ebp, esp
+    pusha
     
     mov     eax, DWORD[ebp+8]
 
@@ -1604,10 +1183,11 @@ fill_capture:
     sub     ecx, esi
     add     ecx, eax
     add     ebx, ecx
-    lea     ebx, [captureW+ebx]
+    lea     ebx, [captureB+ebx]
     mov     ecx, DWORD[ebp+12]
     add     BYTE[ebx], cl
 
+    popa
     mov     esp, ebp
     pop     ebp
     ret
@@ -1638,14 +1218,31 @@ render_intro:
             mov		ebx, 0
             mov     esi, DWORD[ebp+8]
             lea     esi, [esi]
-            mov		bl, BYTE [esi + eax] ;introboard + eax]
+            mov		bl, BYTE [esi + eax]
 
-            cmp     bl, '%'
-            jne     intro_x_endif
-                push    copysymbol
-                push    frmt_unic
+            mov     al, BYTE[userin]
+            add     al, '0'
+            cmp     al, bl
+            jne     intro_x_endif1
+                push    frmt_space
                 call    printf
-                add     esp, 8
+                add     esp, 4
+                push    color_hover
+                call    printf
+                add     esp, 4
+                jmp     intro_x_bottom
+            intro_x_endif1:
+
+            cmp     bl, '1'
+            jl      intro_x_endif
+            cmp     bl, '5'
+            jg      intro_x_endif
+                push    color_normal
+                call    printf
+                add     esp, 4
+                push    frmt_space
+                call    printf
+                add     esp, 4
                 jmp     intro_x_bottom
             intro_x_endif:
             push	ebx
@@ -1721,7 +1318,7 @@ init_intro:
     intro_read_loop_end:
 
     add     esi, 16
-    add     edi, 1080
+    add     edi, 1095
     inc     DWORD[ebp-12]
 
     push    DWORD[ebp-4]
@@ -1735,116 +1332,6 @@ init_intro:
     pop     ebp
     ret
 
-; void save_intro() 
-save_intro:
-    push    ebp
-    mov     ebp, esp
-
-    lea     esi, [save_file]
-    lea     edi, [pieces]
-
-    sub     esp, 4
-
-    push    mode_r
-    push    esi
-    call    fopen
-    add     esp, 8
-    mov     DWORD[ebp-4], eax
-
-    ; loads in the pieces array
-    push    DWORD[ebp-4]
-    push    64
-    push    1
-    push    edi
-    call    fread
-    add     esp, 16
-
-    ; loads in saved capture data for white
-    lea     ebx, [captureW]
-
-    push    DWORD[ebp-4]
-    push    5
-    push    1
-    push    ebx
-    call    fread
-    add     esp, 16
-
-    ; loads in saved capture data for black
-    lea     ebx, [captureB]
-
-    push    DWORD[ebp-4]
-    push    5
-    push    1
-    push    ebx
-    call    fread
-    add     esp, 16
-    ; loads in turn data and castling info
-    ; takes advantage of how variables are stored in memory next to each other
-    lea     ebx, [playerTurn] 
-
-    push    DWORD[ebp-4]
-    push    5
-    push    1
-    push    ebx
-    call    fread
-    add     esp, 16
-
-    push    DWORD[ebp-4]
-    call    fclose
-    add     esp, 4
-
-    mov     DWORD[xyposLast1], -1
-
-    mov     esp, ebp
-    pop     ebp
-    ret
-
-; void save_current ()
-save_current:
-    push    ebp
-    mov     ebp, esp
-
-    sub     esp, 4
-    lea     esi, [save_file]
-
-    push    mode_w
-    push    esi
-    call    fopen
-    add     esp, 8
-    mov     DWORD[ebp-4], eax
-
-    ; writes the board to the file
-    lea     ebx, [pieces]
-    push    DWORD[ebp-4]
-    push    64
-    push    1
-    push    ebx
-    call    fwrite
-    add     esp, 16
-
-    lea     ebx, [captureW]
-    push    DWORD[ebp-4]
-    push    10
-    push    1
-    push    ebx
-    call    fwrite
-    add     esp, 16
-
-    lea     ebx, [playerTurn]
-    push    DWORD[ebp-4]
-    push    5
-    push    1
-    push    ebx
-    call    fwrite
-    add     esp, 16
-
-    push    DWORD[ebp-4]
-    call    fclose
-    add     esp, 4
-
-    mov     esp, ebp
-    pop     ebp
-    ret
 ; void processlinescheck(int inc_x, int inc_y, int mark_offset, int init_pos)
 processlinescheck:
     push    ebp
@@ -1859,12 +1346,14 @@ processlinescheck:
     lea     ecx, [eax*8]
     sub     ebx, ecx
     
+    ; stores into ebp-4, ebp-8 the y and x positions of the king
     mov     DWORD[ebp-4], eax
     mov     DWORD[ebp-8], ebx
     mov     esi, DWORD[ebp+8]
     mov     edi, DWORD[ebp+12]
 
     topprocesscheck:
+    ; calculates valid move square of the offset
     push    edi
     push    esi
     push    DWORD[ebp-4]
@@ -1876,45 +1365,44 @@ processlinescheck:
     je      endprocesscheck
     cmp     BYTE[pieces+eax], "-"
     je      botprocesscheck
-        mov     ebx, "Z"
-        add     ebx, DWORD[ebp+16]
-        xor     ecx, ecx
-        mov     cl, BYTE[pieces+eax]
-        sub     ecx, ebx
-
         ; checks condition if the piece is an enemy or not
-        cmp     ecx, 0
-        jg      n_check
-        cmp     ecx, -32
-        jle     n_check
-        jmp     endprocesscheck
-        
-        n_check:
+        xor     ebx, ebx
+        mov     ebx, "z"
+        sub     ebx, DWORD[ebp+16]
+        sub     bl, BYTE[pieces+eax]
+        cmp     bl, 26
+        jg      endprocesscheck
+        cmp     bl, 0
+        jl      endprocesscheck
+
         mov     ebx, DWORD[ebp+8]
         add     ebx, DWORD[ebp+12]
         xor     ecx, ecx
 
+        ; if the piece was a queen
         mov     cl, "q"
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax], cl
         je      needcheck
 
+        ; if the piece moving on a row (i.e. a rook)
         cmp     ebx, 1
-        je      r_c
+        je      rookCheck
         cmp     ebx, -1
-        je      r_c
+        je      rookCheck
+
+        ; otherwise the piece will be a bishop 
         mov     cl, "b"
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax],cl
         je      needcheck
         jmp     endprocesscheck
 
-        r_c:
+        rookCheck:
         mov     cl, "r"
         sub     ecx, DWORD[ebp+16]
         cmp     BYTE[pieces+eax], cl
         je      needcheck
-
         jmp     endprocesscheck
 
     botprocesscheck:
@@ -1946,11 +1434,11 @@ processchecksquare:
     mov     ebx, DWORD[ebp+24]
     cmp     BYTE[pieces+eax], bl
     jne     endnext
-        cmp     bl, 97
-        jge     black_check
+        cmp     bl, "a"
+        jge     white_check
             mov     BYTE[inCheck+1], 1
             jmp     endnext
-        black_check:
+        white_check:
             mov     BYTE[inCheck], 1
     endnext:
 
@@ -1963,9 +1451,12 @@ bwcalc_check:
     push    ebp
     mov     ebp, esp
 
+    ; ebp-4: loopvar 1, runs lines
+    ; ebp-8: loopvar 2, runs lines
+    ; ebp-12: stores the offset in pieces array of the king
     sub     esp, 12
 
-    ; finds the (x,y) of the king
+    ; finds the location of either B or W king
     mov     eax, 0
     mov     ebx, "K"
     add     ebx, DWORD[ebp+8]
@@ -1977,7 +1468,7 @@ bwcalc_check:
     bot_bcheck:
     mov     DWORD[ebp-12], eax
 
-    ; process lines to pieces
+    ; process lines to pieces from the king move spot
     mov     DWORD[ebp-4], 1
     check_loop_top:
     cmp     DWORD[ebp-4], -2
@@ -1986,6 +1477,7 @@ bwcalc_check:
         check_loop_inner:
         cmp     DWORD[ebp-8], -2
         je      check_loop_bot
+            ; process lines of check (Rook, Bishop, Queen, etc.)
             push    DWORD[ebp-12]
             push    DWORD[ebp+8]
             push    DWORD[ebp-8]
@@ -1993,6 +1485,8 @@ bwcalc_check:
             call    processlinescheck
             add     esp, 16
     
+            ; if in check eax will be 0x800
+            ; stores that value into the inCheck value 
             shr     eax, 11
             mov     ebx, DWORD[ebp+8]
             shr     ebx, 5
@@ -2022,6 +1516,7 @@ bwcalc_check:
     shr     ecx, 4
     mov     edx, 1
     sub     edx, ecx
+    neg     edx
 
     push    ebx
     push    edx
@@ -2039,7 +1534,7 @@ bwcalc_check:
     call    processchecksquare
     add     esp, 20
 
-    mov     ebx, "h"
+    mov     ebx, "n"
     sub     ebx, DWORD[ebp+8]
     mov     DWORD[ebp-12], ebx
 
@@ -2063,6 +1558,7 @@ bwcalc_check:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void sieve_check ()
 sieve_check:
     push    ebp
@@ -2074,7 +1570,7 @@ sieve_check:
     xor     ebx, ebx
     xor     edx, edx
     mov     dl, BYTE[playerTurn]
-    xor     dl, 1
+    ;xor     dl, 1
     mov     bl, BYTE[inCheck+edx]
     mov     DWORD[ebp-16], ebx
 
@@ -2106,7 +1602,7 @@ sieve_check:
 
         ; based on player turn to check function
         mov     dl, BYTE[playerTurn]
-        xor     dl, 1
+        ;xor     dl, 1
         shl     edx, 5
 
         push    edx
@@ -2116,7 +1612,7 @@ sieve_check:
         ; see if check is still true after the movement
         xor     edx, edx
         mov     dl, BYTE[playerTurn]
-        xor     dl, 1
+        ;xor     dl, 1
         mov     ecx, DWORD[ebp-8]
         cmp     BYTE[inCheck+edx], 1
         jne     if_sieve
@@ -2142,78 +1638,62 @@ sieve_check:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void procTurns(char piece)
 procTurns:
     push    ebp
     mov     ebp, esp
 
-    sub     esp, 8
-
-    xor     eax, eax
-    mov     al, BYTE[playerTurn]
-    xor     al, 1
-    shl     eax, 5
-    mov     DWORD[ebp-4], eax
     mov     al, BYTE[playerTurn]
     shl     eax, 5
     add     eax, "A"
-    mov     DWORD[ebp-8], eax
 
-    mov     eax, "P"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn1
-        push    DWORD[ebp-8] 
+    mov     ebx, 15
+    add     ebx, eax
+    cmp     ebx, DWORD[ebp+8]
+    jne     proc_turn1
         call    processpawn
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn1:
-    mov     eax, "R"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn2
-        push    DWORD[ebp-8] 
+    
+    mov     ebx, 17
+    add     ebx, eax
+    cmp     ebx, DWORD[ebp+8]
+    jne     proc_turn2
         call    processrook
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn2:
-    mov     eax, "B"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn3
-        push    DWORD[ebp-8] 
+
+    mov     ebx, 1
+    add     ebx, eax
+    cmp     ebx, DWORD[ebp+8]
+    jne     proc_turn3
         call    processbishop
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn3:
-    mov     eax, "H"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn4
-        push    DWORD[ebp-8] 
+
+    mov     ebx, 13
+    add     ebx,eax
+    cmp     ebx, DWORD[ebp+8]
+    jne     proc_turn4
         call    processknight
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn4:
-    mov     eax, "Q"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
-    jne      proc_turn5
-        push    DWORD[ebp-8] 
+
+    mov     ebx, 16
+    add     ebx, eax
+    cmp     DWORD[ebp+8], ebx
+    jne     proc_turn5
         call    processrook
-        add     esp, 4
-        push    DWORD[ebp-8] 
         call    processbishop
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn5:
-    mov     eax, "K"
-    add     eax, DWORD[ebp-4]
-    cmp     DWORD[ebp+8], eax
+
+    mov     ebx, 10
+    add     ebx, eax
+    cmp     DWORD[ebp+8], ebx
     jne      proc_turn_end
-        push    DWORD[ebp-8] 
         call    processking
-        add     esp, 4
         jmp     proc_turn_end
     proc_turn_end:
     mov     ebx, DWORD[ebp+8]
@@ -2221,6 +1701,7 @@ procTurns:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void procCheckmate(int player)
 procCheckmate:
     push    ebp
@@ -2246,20 +1727,21 @@ procCheckmate:
         mov     DWORD[xpos], edx
         mov     DWORD[ypos], eax
 
-        ; moves the piece into ebx and finds difference between that and "Z"+piece
-        mov     eax, DWORD[ebp+8]
-        add     eax, "Z"
+        ; checks condition if the piece is an enemy or not
         xor     ebx, ebx
-        mov     bl, BYTE[pieces+ecx]
-        sub     eax, ebx
-
-        cmp     eax, 0
-        jl      bot_mate_loop
-        cmp     eax, 26
+        mov     ebx, "z"
+        mov     eax, DWORD[ebp+8]
+        xor     eax, 32
+        sub     ebx, eax
+        sub     bl, BYTE[pieces+ecx]
+        cmp     bl, 26
         jg      bot_mate_loop
+        cmp     bl, 0
+        jl      bot_mate_loop
 
             ; process the turn for that char
-            push    ebx
+            mov     al, BYTE[pieces+ecx]
+            push    eax
             call    procTurns
             add     esp, 4
 
@@ -2285,20 +1767,24 @@ procCheckmate:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void sieve_castle ()
 sieve_castle:
     push    ebp
     mov     ebp, esp
 
+    ; retrieves the piece at the current location 
+    ; converts eax to be be a positive number no matter what
     mov     ebx, DWORD[xyposCur]
     xor     eax, eax
     mov     al, BYTE[pieces+ebx]
     sub     eax, 91
-
     cdq
     xor     eax, edx
     sub     eax, edx
 
+    ; compares with 16 which would indicate the move was a king
+    ; sieves off the further move square so the king can't move through check
     cmp     eax, 16
     jne     end_castle_sieve
         cmp     BYTE[markarr+ebx+1], ""
@@ -2314,11 +1800,14 @@ sieve_castle:
     mov     esp, ebp
     pop     ebp
     ret
+
 ; void save_fen()
 save_fen: 
     push    ebp
     mov     ebp, esp
     
+    sub     esp, 8
+
     ; position, count, iteration
     xor     eax, eax
     xor     ebx, ebx
@@ -2354,19 +1843,6 @@ save_fen:
             xor     ebx, ebx
         fen_ord:
         mov     dl, BYTE[pieces+ecx]
-        mov     esi, "n"
-        cmp     dl, "h"
-        cmove   edx, esi
-        sub     esi, 32
-        cmp     dl, "H"
-        cmove   edx, esi
-        cmp     dl, 96
-        jle     fen_swap
-            sub     dl, 32
-            jmp     fen_swap2
-        fen_swap:
-            add     dl, 32
-        fen_swap2:
         mov     BYTE[fen+eax], dl
         inc     eax
     bot_fen:
@@ -2374,6 +1850,7 @@ save_fen:
     jmp     top_fen
     end_fen:
 
+    ; stores player turn in fen
     mov     ebx, ' w  '
     mov     ecx, ' b  '
     cmp     BYTE[playerTurn], 1
@@ -2381,66 +1858,84 @@ save_fen:
     mov     DWORD[fen+eax], ebx
     add     eax, 3
 
-    xor     ebx, ebx
-    cmp     BYTE[canCastleW+1], 1
-    jne     fen_castle1
+    test    BYTE[castleInf], 1
+    jz      fenCastleN1
         mov     BYTE[fen+eax], "K"
         inc     eax
-        inc     ebx
-    fen_castle1:
-    cmp     BYTE[canCastleW], 1
-    jne     fen_castle2
+    fenCastleN1:
+    test    BYTE[castleInf], 2
+    jz      fenCastleN2
         mov     BYTE[fen+eax], "Q"
         inc     eax
-        inc     ebx
-    fen_castle2:
-    cmp     BYTE[canCastleB+1], 1
-    jne     fen_castle3
+    fenCastleN2:
+    test    BYTE[castleInf], 4
+    jz      fenCastleN3
         mov     BYTE[fen+eax], "k"
         inc     eax
-        inc     ebx
-    fen_castle3:
-    cmp     BYTE[canCastleB], 1
-    jne     fen_castle4
+    fenCastleN3:
+    test    BYTE[castleInf], 8
+    jz      fenCastleN4
         mov     BYTE[fen+eax], "q"
         inc     eax
-        inc     ebx
-    fen_castle4:
-    cmp     ebx, 0
-    jne     fen_castle5
+    fenCastleN4:
+    test    BYTE[castleInf], 15
+    jnz     fenCastleN5
         mov     BYTE[fen+eax], "-"
-        inc eax
-    fen_castle5:
+        inc     eax
+    fenCastleN5:
 
     mov     BYTE[fen+eax], ' '
-    cmp     WORD[enPasTar], 0
-    jne     fenEn
-        mov     BYTE[fen+eax+1], '-'
-        add     eax, 2
-        jmp     endfenEn
-    fenEn:
-        mov     bx, WORD[enPasTar]
-        mov     WORD[fen+eax+1], bx
-        add     eax, 3
-    endfenEn:
-    mov     WORD[fen+eax], ' 0'
-    mov     BYTE[fen+eax+2], ' '
-
+    inc     eax
     mov     ecx, eax
-    xor     eax, eax
+    mov     ebx, 8
+    mov     al, BYTE[enPasTarget]
+    cmp     eax, 0
+    je      fenNoPass
+        cdq
+        div     ebx
+        sub     ebx, eax
+        add     ebx, "0"
+        mov     BYTE[fen+ecx], dl
+        add     BYTE[fen+ecx], "a"
+        mov     BYTE[fen+ecx+1], bl
+        add     ecx, 2
+        jmp     fenEndPass
+    fenNoPass:
+        mov     BYTE[fen+ecx], '-'
+        inc     ecx
+    fenEndPass:
+    mov     BYTE[fen+ecx], ' '
+    inc     ecx
+
+    mov     al, BYTE[halfMove]
+    mov     ebx, 10
+    cdq
+    div     ebx
+    cmp     eax, 0
+    je      fenHalfMove
+        add     al, 48
+        mov     BYTE[fen+ecx], al
+        inc     ecx
+    fenHalfMove:
+    add     dl, 48
+    mov     BYTE[fen+ecx], dl
+    mov     BYTE[fen+ecx+1], ' '
+    add     ecx, 2
+
     mov     al, BYTE[round]
-    dec     al
     mov     ebx, 10
     cdq
     div     ebx
     cmp     eax, 0
     je      fenRound
         add     al, 48
-        mov     BYTE[fen+ecx+3], al
+        mov     BYTE[fen+ecx], al
         inc     ecx
     fenRound:
     add     dl, 48
-    mov     BYTE[fen+ecx+3], dl
+    mov     BYTE[fen+ecx], dl
+    inc     ecx
+    mov     DWORD[ebp-4], ecx
 
     ; saves fen to file
     lea     esi, [fen_file]
@@ -2448,261 +1943,989 @@ save_fen:
     push    esi
     call    fopen
     add     esp, 8
+    mov     DWORD[ebp-8], eax
     lea     ebx, [fen]
     push    eax
-    push    90
+    push    DWORD[ebp-4]
     push    1
     push    ebx
     call    fwrite
     add     esp, 16
+    push    DWORD[ebp-8]
+    call    fclose
+    add     esp, 4
 
     mov     esp, ebp
     pop     ebp
     ret
-; void log_moves
-log_moves:
+
+; struct stackPointer *makestack()
+makestack: 
+    push    ebp
+    mov     ebp, esp
+    
+    push    12
+    call    malloc
+    add     esp, 4
+    mov     DWORD[eax], 0
+    mov     DWORD[eax+4], 0
+    mov     DWORD[eax+8], 0
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; struct snode *makenode()
+makenode: 
+    push    ebp
+    mov     ebp, esp
+
+    push    25
+    call    malloc
+    add     esp, 4
+
+    mov     DWORD[eax], 0
+    mov     DWORD[eax+4], 0
+    mov     DWORD[eax+17], 0x20202020
+    mov     DWORD[eax+21], 0x00202020
+    
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; void pushBack (struct Stack *S, int currPos, int newPos)
+pushBack: 
     push    ebp
     mov     ebp, esp
 
     sub     esp, 4
+
+    ; inserts a new node at the end
+    call    makenode
+    mov     DWORD[ebp-4], eax
+    
+    mov     ebx, DWORD[ebp+8]
+    mov     ecx, DWORD[ebx+8]
+    cmp     ecx, 0
+    jne     insBackElse
+        mov     DWORD[ebx], eax
+        mov     DWORD[ebx+4], eax
+        jmp     insBackEnd
+    insBackElse: 
+        mov     ecx, DWORD[ebp+8]
+        mov     ecx, DWORD[ecx+4]
+        mov     DWORD[ecx], eax
+        mov     ebx, DWORD[ebx+4]
+        mov     DWORD[eax+4], ebx
+        mov     ebx, DWORD[ebp+8]
+        mov     DWORD[ebx+4], eax
+    insBackEnd:
+    mov     ebx, DWORD[ebp+8]
+    inc     DWORD[ebx+8]
+
+    ; increases the current round
+    mov     ebx, DWORD[ebx+8]
+    shr     ebx, 1
+    inc     ebx
+    mov     DWORD[round], ebx
+
+    ; esi - *node
+    ; edi - currPos
+    ; ebx - newPos
+    ; ch - currChar, cl - newChar
+    mov     esi, eax
+    mov     edi, DWORD[ebp+12]
+    mov     ebx, DWORD[ebp+16]
+    mov     ch, BYTE[pieces+edi] 
+    mov     cl, BYTE[pieces+ebx]
+    mov     BYTE[esi+8], 0
+    mov     BYTE[esi+9], 0
+    mov     BYTE[esi+10], 0
+    mov     dh, BYTE[castleInf]
+    mov     BYTE[esi+11], dh
+    mov     edx, edi
+    mov     BYTE[esi+12], dl
+    mov     BYTE[esi+13], bl
+    mov     BYTE[esi+14], ch
+    mov     BYTE[esi+15], cl
+    mov     al, BYTE[halfMove]
+    mov     BYTE[esi+16], al
+    inc     BYTE[halfMove]
+
+    ; moves the pieces on the board
+    mov     BYTE[pieces+edi], '-'
+    mov     BYTE[pieces+ebx], ch
+
+    ; Does the castling
+    xor     eax, eax
+    mov     al, ch
+    sub     eax, 91
+    mov     edx, eax
+    neg     eax
+    cmovl   eax, edx
+    cmp     al, 16
+    jne     endMoveCastle
+    mov     eax, ebx
+    sub     eax, edi
+    cmp     eax, -2
+    je      castleQueen
+    cmp     eax, 2
+    je      castleKing
+    jmp     endMoveCastle
+        castleQueen:
+        mov     al, BYTE[pieces+ebx-2]
+        mov     BYTE[pieces+ebx-2], "-"
+        mov     BYTE[pieces+ebx+1], al
+        mov     BYTE[esi+10], 1
+        mov     BYTE[esi+9], al
+        jmp     endMoveCastle
+        castleKing:
+        mov     al, BYTE[pieces+ebx+1]
+        mov     BYTE[pieces+ebx+1], "-"
+        mov     BYTE[pieces+ebx-1], al
+        mov     BYTE[esi+10], 2
+        mov     BYTE[esi+9], al
+    endMoveCastle:
+
+    ; updates castling information
+    xor     eax, eax
+    mov     al, BYTE[castleInf]
+    mov     edx, 12
+    cmp     ch, "K"
+    cmove   eax, edx
+    and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
+
+    mov     edx, 3
+    cmp     ch, "k"
+    cmove   eax, edx
+    and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
+
+    mov     edx, 7
+    cmp     BYTE[pieces], "r" 
+    cmovne  eax, edx
+    and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
+
+    mov     edx, 11
+    cmp     BYTE[pieces+7], "r" 
+    cmovne  eax, edx
+    and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
+    
+    mov     edx, 13
+    cmp     BYTE[pieces+56], "R" 
+    cmovne  eax, edx
+    and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
+
+    mov     edx, 14
+    cmp     BYTE[pieces+63], "R" 
+    cmovne  eax, edx
+    and     al, BYTE[castleInf]
+    mov     BYTE[castleInf], al
+
+    ; Executes the EnPassant capturing on the board
+    mov     eax, 1
+    xor     edx, edx
+    cmp     ch, "P"
+    cmove   eax, edx
+    cmp     ch, "p"
+    cmove   eax, edx
+    cmp     eax, 0
+    jne     endPawnMoving
+    cmp     BYTE[enPasTarget], 0
+    je      tryEnPassant
+    mov     al, BYTE[enPasTarget]
+    cmp     bl, al
+    jne     tryEnPassant
+        mov     eax, ebx
+        sub     eax, edi
+        mov     edx, eax
+        add     edx, 16
+        cmp     eax, 0
+        cmovl   eax, edx
+        sub     eax, 8
+        add     eax, edi
+        mov     BYTE[esi+9], al
+        mov     dl, BYTE[pieces+eax]  
+        mov     BYTE[pieces+eax], '-'
+        push    1
+        push    edx 
+        call    fill_capture
+        add     esp, 8
+        jmp     endPawnMoving
+    tryEnPassant:
+        mov     eax, ebx
+        sub     eax, edi
+        mov     edx, eax
+        neg     edx
+        cmp     eax, 0
+        cmovl   eax, edx
+        cmp     eax, 16
+        jne     tryPromoting
+            mov     eax, ebx
+            sub     eax, edi
+            sar     eax, 1
+            add     eax, edi
+            mov     BYTE[esi+8], al
+            jmp     endPawnMoving
+    tryPromoting:
+        mov     eax, ebx
+        mov     dl, 56
+        div     dl
+        cmp     ah, 8
+        jge     endPawnMoving
+            promPawnLoop:
+            call    render
+            push    frmt_promote
+            call    printf
+            add     esp, 4
+            call    getUserIn
+            
+            mov     bl, BYTE[userin]
+            cmp     bl, "r"
+            je      promote
+            cmp     bl, "n"
+            je      promote
+            cmp     bl, "q"
+            je      promote
+            cmp     bl, "b"
+            je      promote
+            jmp     promPawnLoop
+
+            promote:
+            mov     esi, DWORD[ebp-4]
+            xor     eax, eax
+            mov     al, BYTE[esi+13]
+            mov     cl, BYTE[playerTurn]
+            xor     ecx, 1
+            shl     ecx, 5
+            sub     bl, cl
+            mov     BYTE[pieces+eax], bl
+    endPawnMoving:
+    mov     al, BYTE[esi+8]
+    mov     BYTE[enPasTarget], al
+
+    xor     eax, eax
+    mov     al, BYTE[esi+15]
+
+    mov     bl, BYTE[esi+14]
+    cmp     bl, "p"
+    je      zeroHalfMove
+    cmp     bl, "P"
+    je      zeroHalfMove
+
+    cmp     al, '-'
+    je      skipHalfMove
+        zeroHalfMove:
+        mov     BYTE[halfMove], 0
+    skipHalfMove:
+
+    ; Keeps track of captured pieces
+    push    1
+    push    eax
+    call    fill_capture
+    add     esp, 8
+
+    mov     BYTE[didMove], 1
+    xor     BYTE[playerTurn], 1
+
+    ; Sees if the king for either side is in check
+    ; Runs twice to calculate for both side 0 - white, 32 - black
+    push    0
+    call    bwcalc_check
+    add     esp, 4
+    push    32
+    call    bwcalc_check
+    add     esp, 4
+
+    ; If the king is in check, then proceed to process checkmate if possible
+    cmp     BYTE[inCheck], 0
+    je      skip_mate
+        push    0 
+        call    procCheckmate
+        add     esp, 4
+    skip_mate:
+    cmp     BYTE[inCheck+1], 0
+    je      skip_mate2
+        push    32
+        call    procCheckmate
+        add     esp, 4
+    skip_mate2:
+
+    ; Makes PGN
+    push    DWORD[ebp-4]
+    call    makePGN
+    add     esp, 4
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; void popBack (struct Stack *S)
+popBack: 
+    push    ebp
+    mov     ebp, esp
+
+    mov     eax, DWORD[ebp+8]
+    cmp     DWORD[eax+8], 0
+    je      skipUndo
+
+    ; ebx contains move node
+    ; size--
+    dec     DWORD[eax+8]
+    mov     ebx, DWORD[eax+4]
+    
+    ; check if size is 0
+    cmp     DWORD[eax+8], 0
+    je      popEmpty
+        mov     ecx, DWORD[ebx+4]
+        ; back -> update to prevNode
+        mov     DWORD[eax+4], ecx
+        ; prevNode -> update next to 0
+        mov     DWORD[ecx], 0
+        jmp     popUndo
+    popEmpty:
+        ; front -> set to 0 if len(stack)=0
+        mov     DWORD[eax], 0
+        mov     DWORD[eax+4], 0
+    popUndo:
+
+    ; restores old game state
+    xor     BYTE[playerTurn], 1
+    mov     al, BYTE[ebx+11]
+    mov     BYTE[castleInf], al
+    mov     al, BYTE[ebx+16]
+    mov     BYTE[halfMove], al
+
+    mov     BYTE[enPasTarget], 0
+    cmp     DWORD[ebx+4], 0
+    je      skipUndoPass
+        mov     eax, DWORD[ebx+4]
+        mov     al, BYTE[eax+8]
+        mov     BYTE[enPasTarget], al
+    skipUndoPass:
 
     mov     eax, DWORD[round]
-    mov     ebx, eax
-    dec     ebx
-    shl     ebx, 4
-
-    cmp     BYTE[playerTurn], 0
-    je      log_turn
-        cmp     eax, 9
-        jg      log_10
-            mov     BYTE[pgn+ebx], ' ' 
-            mov     BYTE[pgn+ebx+1], al
-            add     BYTE[pgn+ebx+1], 48
-            jmp     log_10_end
-        log_10:
-            cdq
-            mov     ecx, 10
-            div     ecx
-            mov     BYTE[pgn+ebx], al
-            mov     BYTE[pgn+ebx+1], dl
-            add     BYTE[pgn+ebx], 48
-            add     BYTE[pgn+ebx+1], 48
-        log_10_end:
-        mov     BYTE[pgn+ebx+2], ' '
-        add     ebx, 3
-        jmp     log_turn_end
-    log_turn:
-    add     ebx, 8
-    cmp     BYTE[pgn+ebx], '+'
-    je      skip_log
-        mov     BYTE[pgn+ebx], ' ' 
-    skip_log:
-    mov     BYTE[pgn+ebx+1], "|"
-    add     ebx, 2
-    inc     BYTE[round]
-
-    log_turn_end:
-    push    ebx 
-    call    move_to_text
-    add     esp, 4
     mov     ecx, eax
-    cdq
-    mov     esi, 8
-    div     esi
-    
-    top_log:
-    cmp     edx, 8
-    je      end_log
-        mov     BYTE[pgn+ecx], ' '
-        inc     edx
-        inc     ecx
-    jmp     top_log
-    end_log:
+    dec     ecx
+    cmp     BYTE[playerTurn], 1
+    cmove   eax, ecx
+    mov     DWORD[round], eax
+
+    ; undoes the move
+    xor     eax, eax
+    mov     al, BYTE[ebx+12]
+    mov     cl, BYTE[ebx+14]
+    mov     BYTE[pieces+eax], cl
+    mov     al, BYTE[ebx+13]
+    mov     cl, BYTE[ebx+15]
+    mov     BYTE[pieces+eax], cl
+
+    ; undoes the castle move
+    cmp     BYTE[ebx+10], 0
+    je      undoCastleEnd
+        xor     edx, edx
+        mov     eax, 1
+        mov     ecx, -2
+        cmp     BYTE[ebx+10], 1
+        cmove   eax, ecx
+        mov     ecx, eax
+        or      ecx, 1
+        mov     dl, BYTE[ebx+12]
+        add     ecx, edx
+        mov     BYTE[pieces+ecx], '-'
+        mov     dl, BYTE[ebx+13]
+        add     eax, edx
+        mov     cl, BYTE[ebx+9]
+        mov     BYTE[pieces+eax], cl
+        mov     al, cl
+        jmp     botUndo
+    undoCastleEnd:
+
+    cmp     BYTE[ebx+9], 0
+    je      botUndo
+        xor     eax, eax
+        mov     al, BYTE[ebx+14]
+        sub     eax, 96
+        neg     eax
+        add     eax, 96
+        mov     cl, BYTE[ebx+9]
+        mov     BYTE[pieces+ecx], al
+        jmp     botUndo2
+    botUndo:
+    xor     eax, eax
+    mov     al, BYTE[ebx+15]
+    botUndo2:
+    push    -1
+    push    eax
+    call    fill_capture
+    add     esp, 8 
+
+    push    ebx
+    call    free
+    add     esp, 4
+    skipUndo:
 
     mov     esp, ebp
     pop     ebp
     ret
 
-; int move_to_text(int pgn_pos)
-move_to_text:
+; void makePGN (struct snode *node)
+makePGN:
     push    ebp
     mov     ebp, esp
 
-    sub     esp, 4
-    mov     eax, DWORD[ebp+8]
+    ; esi - node pointer
+    ; edi - pgn offset
+    sub     esp, 20
+    mov     esi, DWORD[ebp+8]
+    mov     edi, 17
 
-    ; Logs castling Move
-    cmp     BYTE[wasCastle], 0
-    je      log_no_castle
-        mov     BYTE[pgn+eax], 'O'
-        mov     BYTE[pgn+eax+1], '-'
-        mov     BYTE[pgn+eax+2], 'O'
-        add     eax, 3
-        test    BYTE[wasCastle], 1
-        je      convCheckStart
-            mov     BYTE[pgn+eax], '-'
-            mov     BYTE[pgn+eax+1], 'O'
-            add     eax, 2
-            jmp     convCheckStart
-    log_no_castle:
+    ; creates [ebp-4] storing uppercase letter which is the moving piece
+    xor     eax, eax
+    mov     ebx, 32
+    cdq
+    mov     al, BYTE[esi+14]
+    sub     al, "A"
+    div     ebx
+    mov     ecx, edx
+    add     cl, "A"
+    mov     DWORD[ebp-4], ecx
 
-    ; Logs the piece moving
-    cmp     BYTE[currChar], 'p'
-    je      convPawn
-    cmp     BYTE[currChar], 'P'
-    je      convPawn
-        mov     bl, BYTE[currChar]
-        cmp     bl, "h"
-        jne     pgn_h1
-            mov     bl, "N"
-        pgn_h1:
-        cmp     bl, "H"
-        jne     pgn_h2
-            mov     bl, "N" 
-        pgn_h2:
-        cmp     bl, 96
-        jle     pgn_swap
-            sub     bl, 32
-        pgn_swap:
-        mov     BYTE[pgn+eax], bl
-        inc     eax
+    ; creates [ebp-20] storing initial move file (e.g a)
+    mov     al, BYTE[esi+12]
+    mov     ebx, 8
+    cdq
+    div     ebx
+    add     ebx, "0"
+    add     edx, "a"
+    mov     bh, dl
+    mov     DWORD[ebp-20], edx
 
-        mov     DWORD[ebp-4], eax
-        call    check_special  
-        mov     ebx, eax
-        mov     eax, DWORD[ebp-4]
+    ; creates [ebp-8] storing move destination (e.g. e4)
+    mov     al, BYTE[esi+13]
+    mov     ebx, 8
+    cdq
+    div     ebx
+    sub     ebx, eax
+    add     ebx, "0"
+    add     edx, "a"
+    mov     bh, dl
+    mov     DWORD[ebp-8], ebx
 
-        cmp     ebx, 0
-        je      convPawn
-        cmp     ebx, 1
-        jne     logSpec
-            mov     bl, BYTE[moves]
-            mov     BYTE[pgn+eax], bl
-            inc     eax
-            jmp     convPawn
-        logSpec:
-            mov     bl, BYTE[moves+1]
-            mov     BYTE[pgn+eax], bl
-            inc     eax
-    convPawn:
+    ; checks if the move was castling for O-O or O-O-O
+    cmp     BYTE[esi+10], 0
+    je      notPGNCastle
+        mov     BYTE[esi+edi], "O" 
+        mov     BYTE[esi+edi+1], "-"
+        mov     BYTE[esi+edi+2], "O" 
+        add     edi, 3
+        cmp     BYTE[esi+10], 1
+        jne     PGNbot
+            mov     BYTE[esi+edi], "-"
+            mov     BYTE[esi+edi+1], "O" 
+            add     edi, 2
+            jmp     PGNbot
+    notPGNCastle:
 
-    ; Logs a capture (same file and spot)
-    cmp     BYTE[wasPas], 1
-    je      convCapPSkip
-    cmp     BYTE[prevChar], '-'
-    je      convCapture
-        convCapPSkip:
-        cmp     BYTE[currChar], 'p'
-        je      convCapP
-        cmp     BYTE[currChar], 'P'
-        je      convCapP
-            mov     BYTE[pgn+eax], 'x'
-            inc     eax
-            jmp     convCapture
-        convCapP:
-            mov     bl, BYTE[moves]
-            mov     BYTE[pgn+eax], bl
-            mov     BYTE[pgn+eax+1], 'x'
-            add     eax, 2
-    convCapture:     
+    ; checks if the move was a pawn (skips over regular move)
+    cmp     cl, "P"
+    je      PGNcap
 
-    ; Logs space moving
-    mov     bx, WORD[moves+2]
-    mov     BYTE[pgn+eax], bl
-    mov     BYTE[pgn+eax+1], bh 
-    add     eax, 2
+    ; stores in PGN the piece letter moved
+    mov     BYTE[esi+edi], cl
+    inc     edi
 
-    ; Logs a pawn promotion
-    cmp     BYTE[wasProm], 0
-    je      notProm
-        mov     BYTE[wasProm], 0
-        mov     BYTE[pgn+eax], "="
-        mov     bl, BYTE[userin]
-        sub     bl, 32
-        cmp     bl, "H"
-        jne     contProm
-            mov     BYTE[pgn+eax+1], "N"
-            add     eax, 2
-            jmp     notProm
-        contProm:
-            mov     BYTE[pgn+eax+1], bl
-            add     eax, 2
-    notProm:
-
-    ; Logs checkmate
-    cmp     DWORD[errorflag], 0xAA
-    jne     noLogMate
-        mov     BYTE[pgn+eax], "#"
-        inc     eax
-        jmp     convCheckEnd
-    noLogMate:
-
-    ; Logs if move results in check
-    convCheckStart:
-    cmp     BYTE[inCheck], 1
-    je      convCheck
-    cmp     BYTE[inCheck+1], 1
-    je      convCheck    
-        jmp     convCheckEnd
-    convCheck:
-        mov     BYTE[pgn+eax], '+'
-        inc     eax
-    convCheckEnd:
-
-    mov     esp, ebp
-    pop     ebp  
-    ret
-    
-; int check_special (char piece)
-check_special:
-    push    ebp
-    mov     ebp, esp
-
-    xor     ebx, ebx
-    mov     bl, BYTE[currChar]
-
-    cmp     bl, 96
-    jl      spec_low
-        sub     bl, 32    
-        jmp     bef_spec  
-    spec_low:
-        add     bl, 32
-    bef_spec:
-    push    ebx
+    ; calls procTurns to check movement from new location
+    ; this verifies if another piece in same file or another
+    ; piece in different file can move to the same spot
+    mov     DWORD[ebp-12], esi
+    mov     DWORD[ebp-16], edi
+    xor     BYTE[playerTurn], 1
+    call    clearmoves
+    mov     eax, DWORD[ebp-4]
+    mov     bl, BYTE[playerTurn]
+    shl     ebx, 5
+    add     eax, ebx
+    push    eax
     call    procTurns
     add     esp, 4
+    mov     esi, DWORD[ebp-12]
+    mov     edi, DWORD[ebp-16]
+    xor     BYTE[playerTurn], 1
 
-    mov     bl, BYTE[currChar]
-    xor     ecx, ecx
-    xor     eax, eax
-    top_spec:
-    cmp     ecx, 64
-    je      end_spec
-        cmp     BYTE[markarr+ecx], '+'
-        jne     bot_spec
-        cmp     BYTE[pieces+ecx], bl
-        je      spec1
-    bot_spec:
-    inc     ecx
-    jmp     top_spec
-
-    spec1:
-    mov     eax, ecx
+    ; need to fix to be the starting column not the ending column
+    ; puts into cx the file (e.g. abcdefgh)
+    mov     eax, 64
+    sub     eax, DWORD[xpos]
+    mov     ebx, 8
     cdq
-    mov     ecx, 8
-    div     ecx
-    add     edx, 97
-    cmp     BYTE[moves], dl
-    je      spec2
-        mov     eax, 1
-        jmp     end_spec
-    spec2:
-        mov     eax, 2
+    div     ebx
+    mov     ecx, edx
+    mov     dl, BYTE[esi+14]
 
-    end_spec:
+    ; if another piece can move there too (same file)
+    topPGNLoop1:
+    cmp     ecx, 64
+    jge     endPGNLoop1
+        cmp     BYTE[markarr+ecx], "+" 
+        jne     botPGNLoop1
+        cmp     BYTE[pieces+ecx], dl
+        jne     botPGNLoop1
+            mov     ebx, DWORD[ebp-20]
+            mov     BYTE[esi+edi], bh
+            inc     edi
+            jmp     PGNcap
+    botPGNLoop1:
+    add     ecx, 8
+    jmp     topPGNLoop1
+    endPGNLoop1:
+
+    ; if another piece can move there too (not same file)
+    xor     ecx, ecx
+    topPGNLoop2:
+    cmp     ecx, 64
+    jge     endPGNLoop2
+        cmp     BYTE[markarr+ecx], "+" 
+        jne     botPGNLoop2
+        cmp     BYTE[pieces+ecx], dl
+        jne     botPGNLoop2
+            mov     ebx, DWORD[ebp-20]
+            mov     BYTE[esi+edi], bl
+            inc     edi
+            jmp     PGNcap
+    botPGNLoop2:
+    inc     ecx
+    jmp     topPGNLoop2
+    endPGNLoop2:
+
+    ; if resulted in capturing another piece, put an x (includes enPassant cap)
+    PGNcap:
+    cmp     BYTE[esi+9], 0
+    jne     pawnPGNcap
+    cmp     BYTE[esi+15], '-'
+    je      notPGNCap
+        pawnPGNcap:
+        mov     ecx, DWORD[ebp-4]
+        cmp     cl, "P"
+        jne     nopawnPGNcap
+            mov     al, BYTE[esi+12]
+            mov     ebx, 8
+            cdq
+            div     ebx
+            add     edx, "a"
+            mov     BYTE[esi+edi], dl
+            inc     edi
+        nopawnPGNcap:
+        mov     BYTE[esi+edi], 'x'
+        inc     edi
+    notPGNCap:
+
+    ; adds the destination move square to the pgn
+    mov     ecx, DWORD[ebp-8]
+    mov     BYTE[esi+edi], ch
+    mov     BYTE[esi+edi+1], cl
+    add     edi, 2
+    
+    ; if promoting a pawn (adds the =)
+    xor     eax, eax
+    mov     al, BYTE[esi+13]
+    mov     bl, BYTE[pieces+eax]
+    mov     al, BYTE[esi+14]
+    cmp     al, bl
+    je      PGNbot
+        mov     BYTE[esi+edi], "="
+        mov     BYTE[esi+edi+1], bl
+        add     edi, 2
+    PGNbot:
+
+    ; adds + for check and # for checkmate to the pgn
+    mov     eax, 0
+    mov     ebx, "+"
+    mov     ecx, "#"
+    cmp     BYTE[inCheck], 1
+    cmove   eax, ebx
+    cmp     BYTE[inCheck], 1
+    cmove   eax, ebx
+    cmp     DWORD[errorflag], 0xAA
+    cmove   eax, ecx
+    cmp     eax, 0
+    je      noCheckPGN
+        mov     BYTE[esi+edi], al
+        inc     edi
+    noCheckPGN:
+
+    ; cleans up moves just in case anything weird got done
     call    clearmoves
 
     mov     esp, ebp
+    pop     ebp
+    ret
+
+; void printPGN (int lineNumb) 
+printPGN:
+    push    ebp
+    mov     ebp, esp
+
+    sub     esp, 8
+
+    mov     ebx, DWORD[sStruct]
+    mov     ebx, DWORD[ebx]
+    mov     ecx, DWORD[round]
+    dec     ecx
+    cmp     DWORD[ebp+8], ecx
+    jg      replaceW
+    jmp     keepW
+        replaceW:
+        push    " "
+        call    putchar
+        add     esp, 4
+        mov     eax, 1
+        jmp     skipSecondPGN
+    keepW:
+    
+    ; does scrolling, strips off the starting x amount of lines
+    add     cl, BYTE[playerTurn]
+    xor     edx, edx
+    topScroll:
+    cmp     ecx, 10
+    jle     skipScroll
+        mov     ebx, DWORD[ebx]
+        mov     ebx, DWORD[ebx]
+        dec     ecx
+        inc     edx
+        jmp     topScroll
+    skipScroll:
+
+    ; breaks off the lines before; gets the current line of objects
+    mov     ecx, DWORD[ebp+8]
+    topScroll2:
+    cmp     ecx, 0
+    je      skipScroll2
+        mov     ebx, DWORD[ebx]
+        mov     ebx, DWORD[ebx]
+        dec     ecx
+        jmp     topScroll2
+    skipScroll2:
+    cmp     ebx, 0
+    je      replaceW    
+
+    ; displays the proper turn number at the start of the line
+    mov     DWORD[ebp-4], ebx
+    mov     eax, DWORD[ebp+8]
+    inc     eax
+    add     eax, edx
+    push    eax
+    push    frmt_int
+    call    printf
+    add     esp, 8
+
+    ; prints white's move pgn on that line
+    mov     ebx, DWORD[ebp-4]
+    add     ebx, 17
+    push    ebx
+    push    frmt_pgn
+    call    printf
+    add     esp, 8
+
+    ; prints te vertical line down the middle
+    push    VERT
+    push    frmt_unic
+    call    printf
+    add     esp, 8
+
+    ; checks if black has played a move or not
+    ; if so it prints that out otherwise won't
+    mov     eax, 11
+    mov     ebx, DWORD[ebp-4]
+    mov     ebx, DWORD[ebx]
+    cmp     ebx, 0
+    je      skipSecondPGN
+        add     ebx, 17
+        push    ebx
+        push    frmt_reg
+        call    printf
+        add     esp, 8
+        mov     eax, 18
+    skipSecondPGN:
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; char nonblockgetchar ()
+nonblockgetchar:
+    push    ebp
+    mov     ebp, esp
+
+	sub		esp, 8
+
+	push	0
+	push	4
+	push	0
+	call	fcntl
+	add		esp, 12
+	mov		DWORD [ebp-4], eax
+
+	or		DWORD [ebp-4], 2048
+	push	DWORD [ebp-4]
+	push	4
+	push    0
+	call	fcntl
+	add		esp, 12
+
+	call	getchar
+	mov		DWORD [ebp-8], eax
+
+	xor		DWORD [ebp-4], 2048
+	push	DWORD [ebp-4]
+	push	4
+	push	0
+	call	fcntl
+	add		esp, 12
+
+	mov		eax, DWORD [ebp-8]
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; int processgetchar (char* array)
+processgetchar:
+    push    ebp
+    mov     ebp, esp
+
+    sub     esp, 8
+    mov     DWORD[ebp-4], 0
+    
+    topGetCharLoop:
+    call    nonblockgetchar
+    mov     DWORD[ebp-8], eax  
+
+    xor     eax, eax
+    mov     ebx, DWORD[ebp-8]
+    cmp     bl, -1
+    je      endGetCharLoop
+
+    mov     ecx, DWORD[ebp+8]
+    mov     edx, DWORD[ebp-4]
+    mov     BYTE[ecx+edx], bl
+    inc     DWORD[ebp-4]
+
+    cmp     bl, 'M'
+    je      returnGetChar
+    cmp     bl, 'a'
+    jl      topGetCharLoop
+    cmp     bl, 'z'
+    jg      topGetCharLoop
+    returnGetChar:
+        mov     eax, edx
+        inc     eax
+    endGetCharLoop:
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; void getUserIn ()
+getUserIn:
+    push    ebp
+    mov     ebp, esp
+
+    sub     esp, 32
+    push    17
+    call    malloc
+    add     esp, 4
+
+    mov     DWORD[ebp-4], eax
+    mov     DWORD[ebp-8], eax
+    add     DWORD[ebp-8], 3
+
+    topScanLoop:
+    push    500
+    call    usleep
+    add     esp, 4
+    push    DWORD[ebp-4]
+    call    processgetchar
+    add     esp, 4
+    mov     DWORD[ebp-16], eax
+    cmp     eax, 0
+    je      topScanLoop
+    cmp     eax, 1
+    jne     processMouse
+        mov     ebx, DWORD[ebp-4]
+        mov     al, BYTE[ebx]
+        mov     BYTE[userin], al
+        jmp     endScanLoop
+    processMouse:
+    mov     ebx, DWORD[ebp-4]
+    xor     ecx, ecx
+    mov     cl, BYTE[ebx+eax-1]
+    mov     DWORD[ebp-32], ecx
+
+    push    frmt_delim
+    push    DWORD[ebp-8]
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-20], eax
+
+    push    frmt_delim
+    push    0
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-24], eax
+
+    push    frmt_Mm
+    push    0
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-28], eax
+
+    cmp     DWORD[ebp-20], 2
+    jne     contMouseIf
+        mov     BYTE[userin], 'z'
+        jmp     endScanLoop
+    contMouseIf:
+    cmp     DWORD[ebp-20], 0
+    jne     topScanLoop
+    cmp     DWORD[ebp-32], "M"
+    jne     topScanLoop
+    cmp     DWORD[ebp-24], 21
+    jl      topScanLoop
+    cmp     DWORD[ebp-24], 36
+    jg      topScanLoop
+    cmp     DWORD[ebp-28], 5
+    jl      topScanLoop
+    cmp     DWORD[ebp-28], 12
+    jg      topScanLoop
+        mov     eax, DWORD[ebp-28]
+        sub     eax, 5
+        mov     ebx, 8
+        sub     ebx, eax
+        add     ebx, "0"
+        mov     BYTE[userin+1], bl
+        mov     eax, DWORD[ebp-24]
+        sub     eax, 21
+        shr     eax, 1
+        add     eax, "a"
+        mov     BYTE[userin], al
+        mov     BYTE[userin+2], 0
+    endScanLoop:
+    push    DWORD[ebp-4]
+    call    free
+    add     esp, 4
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+; void getUserIn2 ()
+getUserIn2:
+    push    ebp
+    mov     ebp, esp
+
+    sub     esp, 32
+    push    17
+    call    malloc
+    add     esp, 4
+
+    mov     DWORD[ebp-4], eax
+    mov     DWORD[ebp-8], eax
+    add     DWORD[ebp-8], 3
+
+    topScanLoop2:
+    push    500
+    call    usleep
+    add     esp, 4
+    mov     BYTE[userin], 0
+    push    DWORD[ebp-4]
+    call    processgetchar
+    add     esp, 4
+    mov     DWORD[ebp-16], eax
+    cmp     eax, 0
+    je      topScanLoop2
+    cmp     eax, 1
+    jne     processMouse2
+        mov     ebx, DWORD[ebp-4]
+        mov     al, BYTE[ebx]
+        mov     BYTE[userin], al
+        jmp     endScanLoop2
+    processMouse2:
+    mov     ebx, DWORD[ebp-4]
+    xor     ecx, ecx
+    mov     cl, BYTE[ebx+eax-1]
+    mov     DWORD[ebp-32], ecx
+
+    push    frmt_delim
+    push    DWORD[ebp-8]
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-20], eax
+
+    push    frmt_delim
+    push    0
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-24], eax
+
+    push    frmt_Mm
+    push    0
+    call    strtok
+    add     esp, 8
+    push    eax
+    call    atoi
+    add     esp, 4
+    mov     DWORD[ebp-28], eax
+
+    cmp     DWORD[ebp-28], 9
+    jle     endScanLoop2 
+    cmp     DWORD[ebp-28], 14
+    jge     endScanLoop2
+    cmp     DWORD[ebp-24], 32
+    jl      endScanLoop2
+    cmp     DWORD[ebp-24], 43
+    jg      endScanLoop2
+
+    cmp     DWORD[ebp-20], 0
+    je      clickIntro
+    cmp     DWORD[ebp-20], 35
+    je      hoverIntro
+    jmp     topScanLoop2
+
+    clickIntro:
+    mov     eax, DWORD[ebp-28]
+    sub     eax, 5
+    mov     BYTE[userin], al
+    jmp     endScanLoop2
+
+    hoverIntro:
+    mov     eax, DWORD[ebp-28]
+    sub     eax, 9
+    mov     BYTE[userin], al
+
+    endScanLoop2:
+    push    DWORD[ebp-4]
+    call    free
+    add     esp, 4
+
+    mov     esp, ebp
+
     pop     ebp
     ret
 ; vim:ft=nasm
