@@ -1,15 +1,16 @@
-%define BOARD_FILE 'media/board.txt'
-%define INTRO_FILE 'media/intro.txt'
-%define STRUC_FILE 'media/instructions.txt'
-%define FEN_FILE   'saves/saves.fen'
-%define INIT_FILE  'media/.init'
-%define HEIGHT     15
-%define WIDTH      73
-%define TOPVERT    4  
-%define TOPHORZ    20
-%define ENDVERT    12
-%define ENDHORZ    36 
-%define ENDHORZ2   37
+%define BOARD_FILE   'media/board.txt'
+%define INTRO_FILE   'media/intro.txt'
+%define STRUC_FILE   'media/instructions.txt'
+%define FEN_FILE     'saves/saves.fen'
+%define INIT_FILE    'media/.init'
+%define WEIGHT_FILE  'media/.weights'
+%define HEIGHT       15
+%define WIDTH        73
+%define TOPVERT      4  
+%define TOPHORZ      20
+%define ENDVERT      12
+%define ENDHORZ      36 
+%define ENDHORZ2     37
 
 segment .data
     board_file          db  BOARD_FILE, 0
@@ -17,6 +18,7 @@ segment .data
     struc_file          db  STRUC_FILE, 0
     init_file           db  INIT_FILE, 0
     fen_file            db  FEN_FILE, 0
+    weight_file         db  WEIGHT_FILE, 0
     mode_r              db  "r", 0
     mode_w              db  "w", 0
     raw_mode_on_cmd     db  "stty raw -echo", 0
@@ -68,6 +70,7 @@ segment .data
     frmt_spacemate      db  "%46s", 0
     frmt_pgn            db  " %s", 0
     frmt_int            db  "%2d", 0
+    frmt_regint         db  "%d", 0
     frmt_print          db  "Enter a move: ", 0
     frmt_print2         db  "Enter a destination: ", 0
     frmt_bcheck         db  "White in Check", 10, 13, 0
@@ -82,7 +85,9 @@ segment .data
     frmt_intro          db  "Enter an option: ", 0
     frmt_cont           db  "---- Right Click or z to continue ----", 0
     memjumparr          db  3,0,0,0,0,0,0,0,0,5,0,0,2,0,0,4,1
+    pieceWeights        dd  300,0,0,0,0,0,0,0,0,9000,0,0,300,0,100,900,500
     knightarr           dd  -1,-2,1,-2,2,-1,2,1,-1,2,1,2,-2,1,-2,-1
+    depth               dd  3
 
 segment .bss
     board       resb    (HEIGHT*WIDTH)
@@ -109,6 +114,12 @@ segment .bss
     castleInf   resb    1
     enPasTarget resb    1
     halfMove    resb    1
+    pawnEval    resd    64
+    rookEval    resd    64
+    knightEval  resd    64
+    bishEval    resd    64
+    queenEval   resd    64
+    kingEval    resd    64
 
 segment .text
 	global  main
@@ -122,6 +133,7 @@ segment .text
     extern  fwrite
     extern  fclose
     extern  fgetc
+    extern  fscanf
     extern  setlocale
     extern  malloc
     extern  free
@@ -140,17 +152,21 @@ main:
     ; prepares the terminal for mouse input
     ; creates the doubly linked list which holds all previous moves
     call    init_intro    	
+    call    seed_start
+
     push    frmt_locale
     push    0x6
     call    setlocale
     add     esp, 8
-    call    seed_start
     push    initSys
     call    system
     add     esp, 4
     push    initMouse
     call    system
     add     esp, 4
+
+    ; REMOVE
+    jmp     game_loop
 
     ; runs the initial start screen and takes in clicks or keyboard
     ; input to do the selected menu item
@@ -194,12 +210,29 @@ main:
 
     ; This is where the main game actually starts
     game_loop:
+
         ; sets gameStatus and waits on the user to do something
         mov     BYTE[inGame], 1
         mov     BYTE[didMove], 0
         call    render
         call    clearmoves
-        call    getUserIn
+        cmp     DWORD[playerTurn], 1
+        je      aiTurn
+            ;push    userin
+            ;push    frmt_reg
+            ;call    scanf
+            ;add     esp, 8
+            call    getUserIn
+            jmp     regTurn
+        aiTurn:
+            call    minimaxRoot
+            push    ebx
+            push    eax
+            push    DWORD[sStruct]
+            call    pushBack
+            add     esp, 12
+            jmp     game_bottom
+        regTurn:
     
         ; If the user pressed q then quits
         mov     al, BYTE[userin]
@@ -221,6 +254,9 @@ main:
         ; If the user pressed u then runs an undo function for the last move
         cmp     al, 'u'
         jne     end_undo
+            push    DWORD[sStruct]
+            call    popBack
+            add     esp, 4
             push    DWORD[sStruct]
             call    popBack
             add     esp, 4
@@ -253,6 +289,10 @@ main:
         game_next:
         call    render
         call    getUserIn
+        ;push    userin
+        ;push    frmt_reg
+        ;call    scanf
+        ;add     esp, 8
 
         ; If the user pressed z then exit out of the piece selection
         cmp     BYTE[userin], 'z'
@@ -316,6 +356,9 @@ seed_start:
     push    ebp
     mov     ebp, esp
 
+    sub     esp, 8
+    mov     DWORD[ebp-4], 0
+
     ; opens the file called init in the media folder
     ; this is used to scan in the starting positions into the pieces array
     lea     esi, [init_file]
@@ -324,12 +367,42 @@ seed_start:
     push    esi
     call    fopen
     add     esp, 8
+    mov     DWORD[ebp-8], eax
     push    eax
     push    64
     push    1
     push    edi
     call    fread
     add     esp, 16
+    push    DWORD[ebp-8]
+    call    fclose
+    add     esp, 4
+
+    ; opens the file called .weights in the media folder
+    push    mode_r
+    lea     esi, [weight_file]
+    push    esi
+    call    fopen
+    add     esp, 8
+    mov     DWORD[ebp-8], eax
+
+    ; this is used to store the ai value weights in their arrays
+    weightsLoop:
+    mov     eax, DWORD[ebp-4]
+    cmp     eax, 320
+    je      endWeights
+        lea     edi, [pawnEval+eax*4]
+        push    edi
+        push    frmt_regint
+        push    DWORD[ebp-8]
+        call    fscanf
+        add     esp, 12
+    inc     DWORD[ebp-4]
+    jmp     weightsLoop
+    endWeights:
+    push    DWORD[ebp-8]
+    call    fclose
+    add     esp, 4
 
     ; initializes all the variables necessary to their starting values
     call    clearmoves
@@ -1012,7 +1085,7 @@ convertpoint:
     mov     ebp, esp
 
     ; first letter entered is moved to al
-    mov     eax, 0
+    xor     eax, eax
     mov     al, BYTE[userin]
 
     ; Check to see if is a valid letter, stored in xpos
@@ -2928,4 +3001,414 @@ getUserIn2:
 
     pop     ebp
     ret
+; int minimaxRoot ()
+minimaxRoot:
+    push    ebp
+    mov     ebp, esp
+
+    ; ebp-4: int loop_iteration
+    ; ebp-8: int bestmove
+    ; ebp-12: startBestMove
+    ; ebp-16: endBestMove
+    ; ebp-80: copy of markArray
+    ; ebp-84: tmp spot
+    ; ebp-88: innerloop counter
+    sub     esp, 88
+    mov     DWORD[ebp-4], 0
+    mov     DWORD[ebp-8], -9999
+
+    ; clears any extra moved stored 
+    call    clearmoves
+
+    ; loops over all possible moves
+    top_maxroot_loop:
+    cmp     DWORD[ebp-4], 64
+    je      end_maxroot_loop
+        ; stores xpos, ypos, userin
+        mov     eax, DWORD[ebp-16]
+        shr     eax, 3
+        mov     DWORD[ebp-24], eax
+        mov     DWORD[ebp-27], 56
+        sub     DWORD[ebp-27], eax
+        shl     eax, 3
+        sub     eax, DWORD[ebp-16]
+        neg     eax
+        mov     DWORD[ebp-20], eax
+        mov     DWORD[ebp-28], 97
+        add     DWORD[ebp-28], eax
+
+        ; checks condition if the piece is playable for itself
+        xor     eax, eax
+        mov     al, "z"
+        mov     ebx, DWORD[playerTurn]
+        xor     bl, 1
+        shl     ebx, 5
+        sub     eax, ebx
+        mov     ecx, DWORD[ebp-16]
+        sub     al, BYTE[pieces+ecx]
+        cmp     al, 26
+        jg      bot_minimax_loop
+        cmp     al, 0
+        jl      bot_minimax_loop
+
+            ; process the turn for that char
+            mov     al, BYTE[pieces+ecx]
+            push    eax
+            call    procTurns
+            add     esp, 4
+
+            ; removes moves that cannot be used
+            call    sieve_check
+            call    sieve_castle
+
+            ; stores the marked moves locally
+            cld     
+            lea     esi, markarr
+            lea     edi, [ebp-80]
+            mov     ecx, 64
+            rep movsb
+
+            ; while loop that goes through all moves in the markarr
+            jmp     while_moves
+
+            top_while_move:
+                mov     DWORD[ebp-88], 0
+                top_for_move:
+                mov     ecx, DWORD[ebp-88]
+                cmp     BYTE[markarr+ecx], "+"
+                jne     bot_for_move
+                    ; plays that move by calling pushBack
+                    mov     BYTE[ebp-80+ecx], 0
+                    mov     DWORD[ebp-84], ecx
+                    push    ecx
+                    push    DWORD[ebp-4]
+                    push    DWORD[sStruct]
+                    call    pushBack
+                    add     esp, 12
+
+                    ; make a call to minimax with params
+                    push    0
+                    push    10000
+                    push    -10000
+                    push    DWORD[depth]
+                    call    minimax
+                    add     esp, 16
+
+                    ; look at outcome of return value
+                    cmp     eax, DWORD[ebp-8]
+                    jl      noUpdate
+                        mov     DWORD[ebp-8], eax
+                        mov     ebx, DWORD[ebp-4]
+                        mov     DWORD[ebp-12], ebx
+                        mov     ebx, DWORD[ebp-84]
+                        mov     DWORD[ebp-16], ebx
+                    noUpdate:
+
+                    ; undo the move above
+                    push    DWORD[sStruct]
+                    call    popBack
+                    add     esp, 4
+
+                    jmp     while_moves
+        
+                bot_for_move:
+                inc     DWORD[ebp-88]
+                jmp     top_for_move
+
+            while_moves:
+            cld     
+            lea     edi, markarr
+            lea     esi, [ebp-80]
+            mov     ecx, 64
+            rep movsb
+            call    calcnumbmoves
+            cmp     eax, 0
+            jne     top_while_move
+
+    bot_maxroot_loop:
+    call    clearmoves
+    inc     DWORD[ebp-4]
+    jmp     top_maxroot_loop
+    end_maxroot_loop: 
+
+    ; clears moves just in case
+    call    clearmoves
+
+    mov     eax, DWORD[ebp-12]
+    mov     ebx, DWORD[ebp-16]
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; minimax (depth, alpha, beta, isMaximisingPlayer)
+minimax:
+    push    ebp
+    mov     ebp, esp
+
+    ; ebp-4: bestmove
+    ; ebp-12: bit marked array
+    ; ebp-16: saved xypos
+    ; ebp-20: saved xpos
+    ; ebp-24: saved ypos
+    ; ebp-28: userin
+    ; ebp-32: inner counter  
+    ; ebp-96: stored mark array (deprecated)
+    sub     esp, 96
+
+    ; returns the -result of evaluateBoard
+    cmp     DWORD[ebp+8], 0
+    jne     minimax_rec
+        call    evaluateBoard
+        neg     eax
+        jmp     bot_minimax
+    minimax_rec: 
+
+    ; stores bestMove 
+    mov     eax, 9999
+    mov     ebx, -9999
+    cmp     DWORD[ebp+20], 0
+    cmove   eax, ebx
+    mov     DWORD[ebp-4], eax
+
+    ; loops over all possible moves
+    mov     DWORD[ebp-16], 0
+    top_minimax_loop:
+    cmp     DWORD[ebp-16], 64
+    je      end_minimax_loop
+        ; stores xpos, ypos, userin
+        mov     eax, DWORD[ebp-16]
+        shr     eax, 3
+        mov     DWORD[ebp-24], eax
+        mov     DWORD[ebp-27], 56
+        sub     DWORD[ebp-27], eax
+        shl     eax, 3
+        sub     eax, DWORD[ebp-16]
+        neg     eax
+        mov     DWORD[ebp-20], eax
+        mov     DWORD[ebp-28], 97
+        add     DWORD[ebp-28], eax
+
+        ; checks condition if the piece is playable for itself
+        xor     eax, eax
+        mov     al, "z"
+        mov     ebx, DWORD[playerTurn]
+        xor     bl, 1
+        shl     ebx, 5
+        sub     eax, ebx
+        mov     ecx, DWORD[ebp-16]
+        sub     al, BYTE[pieces+ecx]
+        cmp     al, 26
+        jg      bot_minimax_loop
+        cmp     al, 0
+        jl      bot_minimax_loop
+
+            ; process the turn for that char, removing non-playable moves
+            call    clearmoves
+            mov     ecx, DWORD[ebp-16]
+            mov     DWORD[xyposCur], ecx
+            mov     eax, DWORD[ebp-20]
+            mov     DWORD[xpos], eax 
+            mov     eax, DWORD[ebp-24]
+            mov     DWORD[ypos], eax
+            mov     ax, WORD[ebp-28]
+            mov     WORD[userin], ax
+            mov     bl, BYTE[pieces+ecx]
+            push    ebx
+            call    procTurns
+            add     esp, 4
+            call    sieve_check
+            call    sieve_castle
+
+            ; stores the marked moves locally
+            cld     
+            lea     esi, markarr
+            lea     edi, [ebp-96]
+            mov     ecx, 64
+            rep movsb
+
+            ; while loop that goes through all moves in markarr
+            jmp     mmwhile_moves
+            top_mmwhile_move:
+            mov     DWORD[ebp-32], 0
+            top_mmfor_move:
+            mov     ecx, DWORD[ebp-32]
+            cmp     BYTE[markarr+ecx], "+"
+            jne     bot_mmfor_move
+                mov     BYTE[ebp-96+ecx], 0
+
+                ; plays that move by calling pushback
+                push    ecx
+                push    DWORD[ebp-16]
+                push    DWORD[sStruct]
+                call    pushBack
+                add     esp, 12
+
+                ; make a recursive call to this function
+                mov     eax, DWORD[ebp+20]
+                xor     eax, 1
+                push    eax
+                push    DWORD[ebp+16]
+                push    DWORD[ebp+12]
+                mov     eax, DWORD[ebp+8]
+                dec     eax
+                push    eax
+                call    minimax
+                add     esp, 16
+
+                ; update the alpha and beta
+                cmp     DWORD[ebp+20], 0
+                je      updateAlpha
+
+                ; update bestMove to be the max between function and stored
+                mov     ebx, DWORD[ebp-4]
+                cmp     ebx, eax
+                cmovl   eax, ebx
+                mov     DWORD[ebp-4], eax
+
+                ; update the alpha value
+                mov     ebx, DWORD[ebp+16]
+                cmp     ebx, eax
+                cmovl   eax, ebx
+                mov     DWORD[ebp+16], eax
+
+                ; call the undo move function
+                push    DWORD[sStruct]
+                call    popBack
+                add     esp, 4
+
+                ; return if condition
+                mov     eax, DWORD[ebp+12]
+                cmp     DWORD[ebp+16], eax
+                jle     end_minimax_loop
+                jmp     mmwhile_moves
+
+                updateAlpha:
+                ; update bestMove to be the max between function and stored
+                mov     ebx, DWORD[ebp-4]
+                cmp     ebx, eax
+                cmovg   eax, ebx
+                mov     DWORD[ebp-4], eax
+
+                ; update the alpha value
+                mov     ebx, DWORD[ebp+12]
+                cmp     ebx, eax
+                cmovg   eax, ebx
+                mov     DWORD[ebp+12], eax
+
+                ; call the undo move function
+                push    DWORD[sStruct]
+                call    popBack
+                add     esp, 4
+
+                ; return if condition
+                mov     eax, DWORD[ebp+12]
+                cmp     DWORD[ebp+16], eax
+                jle     end_minimax_loop
+                jmp     mmwhile_moves
+
+                bot_mmfor_move:
+                inc     DWORD[ebp-32]
+                jmp     top_mmfor_move
+            mmwhile_moves:
+            cld     
+            lea     edi, markarr
+            lea     esi, [ebp-96]
+            mov     ecx, 64
+            rep movsb
+            call    calcnumbmoves
+            cmp     eax, 0
+            jne     top_mmwhile_move
+    bot_minimax_loop:
+    call    clearmoves
+    inc     DWORD[ebp-16]
+    jmp     top_minimax_loop
+    end_minimax_loop: 
+
+    call    clearmoves
+    mov     eax, DWORD[ebp-4]
+
+    bot_minimax:
+    mov     esp, ebp
+    pop     ebp
+    ret
+
+; int evaluateBoard()
+evaluateBoard:
+    push    ebp
+    mov     ebp, esp
+    
+    ; ebp-4: counter1
+    ; ebp-8: counter2
+    ; ebp-12: evaluation
+    sub     esp, 12
+    mov     DWORD[ebp-4], 0
+    mov     DWORD[ebp-8], 0
+    mov     DWORD[ebp-12], 0
+
+    topEval1:
+    mov     ecx, DWORD[ebp-4]
+    cmp     ecx, 8
+    je      endEval
+        topEval2:
+        mov     edx, DWORD[ebp-8]
+        cmp     edx, 8
+        je      botEval
+            ; if the piece is empty
+            cmp     BYTE[pieces+8*ecx+edx], '-'
+            je      botEval
+
+            ; determine white (+) or black (-)
+            xor     eax, eax
+            xor     ebx, ebx
+            mov     al, 96
+            sub     al, BYTE[pieces+8*ecx+edx]
+    
+            ; store the location of eval in ebx
+            mov     esi, 64
+            cmp     eax, 0
+            cmovl   ebx, esi
+            mov     esi, ecx
+            add     esi, edx
+            mov     edi, esi
+            neg     edi
+            cmp     eax, 0
+            cmovl   esi, edi
+            add     ebx, esi
+
+            ; get position in alphabet for pieceWeigt
+            mov     al, BYTE[pieces+8*ecx+edx]
+            sub     al, 65
+            mov     esi, eax
+            sub     esi, 32
+            cmp     esi, 0
+            cmovge  eax, esi
+            dec     eax
+            
+            ; get the pieceWeight at that location
+            mov     esi, DWORD[pieceWeights+eax*4]
+
+            ; get the evalBoard at that location
+            mov     al, BYTE[memjumparr+eax]
+            shl     eax, 6
+            add     esi, DWORD[pawnEval+eax+ebx]
+
+            ; update the total
+            add     DWORD[ebp-12], esi
+    botEval:
+    inc     DWORD[ebp-4]
+    mov     DWORD[ebp-8], 0
+    jmp     topEval1
+    endEval:
+
+    ; divide by 10 to get correct value
+    mov     eax, DWORD[ebp-12]
+    cdq
+    mov     ebx, 10
+    idiv    ebx
+
+    mov     esp, ebp
+    pop     ebp
+    ret
+
 ; vim:ft=nasm
