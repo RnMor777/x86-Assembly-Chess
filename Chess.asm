@@ -153,7 +153,7 @@ main:
     ; creates the doubly linked list which holds all previous moves
     call    init_intro    	
     call    seed_start
-
+    
     push    frmt_locale
     push    0x6
     call    setlocale
@@ -166,7 +166,7 @@ main:
     add     esp, 4
 
     ; REMOVE
-    jmp     game_loop
+    ;jmp     game_loop
 
     ; runs the initial start screen and takes in clicks or keyboard
     ; input to do the selected menu item
@@ -216,8 +216,8 @@ main:
         mov     BYTE[didMove], 0
         call    render
         call    clearmoves
-        cmp     DWORD[playerTurn], 1
-        je      aiTurn
+        ;cmp     DWORD[playerTurn], 1
+        ;je      aiTurn
             ;push    userin
             ;push    frmt_reg
             ;call    scanf
