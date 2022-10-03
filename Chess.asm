@@ -257,9 +257,9 @@ main:
             push    DWORD[sStruct]
             call    popBack
             add     esp, 4
-            push    DWORD[sStruct]
-            call    popBack
-            add     esp, 4
+            ;push    DWORD[sStruct]
+            ;call    popBack
+            ;add     esp, 4
         end_undo:
 
         ; Converts the entered points into integer values in the array
@@ -282,7 +282,7 @@ main:
         call    sieve_check
         call    sieve_castle
         call    calcnumbmoves
-        cmp     eax, 0
+        cmp     eax, 0x69
         je      game_bottom
 
         ; STEP 2: Get the destination square
@@ -1151,7 +1151,7 @@ calcnumbmoves:
 
     mov     ecx, 0x69
     cmp     eax, 0
-    cmovne  eax, ecx
+    cmove   eax, ecx
     mov     DWORD[errorflag], eax
 
     mov     esp, ebp
@@ -3063,7 +3063,7 @@ minimaxRoot:
 
             ; stores the marked moves locally
             cld     
-            lea     esi, markarr
+            ;lea     esi, markarr
             lea     edi, [ebp-80]
             mov     ecx, 64
             rep movsb
@@ -3117,7 +3117,7 @@ minimaxRoot:
 
             while_moves:
             cld     
-            lea     edi, markarr
+            ;lea     edi, markarr
             lea     esi, [ebp-80]
             mov     ecx, 64
             rep movsb
@@ -3222,7 +3222,7 @@ minimax:
 
             ; stores the marked moves locally
             cld     
-            lea     esi, markarr
+            ;lea     esi, markarr
             lea     edi, [ebp-96]
             mov     ecx, 64
             rep movsb
@@ -3312,7 +3312,7 @@ minimax:
                 jmp     top_mmfor_move
             mmwhile_moves:
             cld     
-            lea     edi, markarr
+            ;lea     edi, markarr
             lea     esi, [ebp-96]
             mov     ecx, 64
             rep movsb
